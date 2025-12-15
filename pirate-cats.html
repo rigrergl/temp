@@ -16,6 +16,13 @@
             user-select: none;
         }
 
+        :root {
+            --sab: env(safe-area-inset-bottom, 20px);
+            --sat: env(safe-area-inset-top, 0px);
+            --sal: env(safe-area-inset-left, 0px);
+            --sar: env(safe-area-inset-right, 0px);
+        }
+
         body {
             background: #1a1a2e;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -30,6 +37,7 @@
             position: relative;
             width: 100vw;
             height: 100vh;
+            height: calc(var(--vh, 1vh) * 100);
             overflow: hidden;
         }
 
@@ -40,9 +48,9 @@
 
         #ui {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
+            top: max(5px, var(--sat));
+            left: max(5px, var(--sal));
+            right: max(5px, var(--sar));
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
@@ -51,34 +59,34 @@
         }
 
         .ui-panel {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             border: 2px solid #ffd700;
-            border-radius: 10px;
-            padding: 8px 12px;
+            border-radius: 8px;
+            padding: 5px 8px;
             color: #fff;
-            font-size: 14px;
+            font-size: 12px;
             pointer-events: auto;
         }
 
         .stat {
             display: flex;
             align-items: center;
-            gap: 5px;
-            margin: 3px 0;
+            gap: 3px;
+            margin: 2px 0;
         }
 
         .stat-icon {
-            font-size: 16px;
+            font-size: 14px;
         }
 
         #controls {
             position: absolute;
-            bottom: 20px;
-            left: 0;
-            right: 0;
+            bottom: calc(15px + var(--sab));
+            left: max(10px, var(--sal));
+            right: max(10px, var(--sar));
             display: flex;
             justify-content: space-between;
-            padding: 0 20px;
+            align-items: flex-end;
             pointer-events: none;
             z-index: 100;
         }
@@ -87,23 +95,23 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 3px;
             pointer-events: auto;
         }
 
         .control-row {
             display: flex;
-            gap: 5px;
+            gap: 3px;
         }
 
         .control-btn {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
-            background: rgba(255, 215, 0, 0.8);
+            background: rgba(255, 215, 0, 0.9);
             border: 3px solid #8B4513;
             color: #8B4513;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             display: flex;
             align-items: center;
@@ -118,16 +126,20 @@
         }
 
         .action-btn {
-            width: 70px;
-            height: 70px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
-            background: rgba(220, 20, 60, 0.9);
+            background: rgba(220, 20, 60, 0.95);
             border: 3px solid #8B0000;
             color: #fff;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         .action-btn:active {
@@ -136,8 +148,15 @@
         }
 
         .action-btn.secondary {
-            background: rgba(30, 144, 255, 0.9);
+            background: rgba(30, 144, 255, 0.95);
             border-color: #0066AA;
+        }
+
+        .action-cluster {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
         }
 
         #startScreen, #gameOverScreen, #shopScreen, #victoryScreen {
@@ -153,7 +172,10 @@
             justify-content: center;
             z-index: 200;
             padding: 20px;
+            padding-top: calc(20px + var(--sat));
+            padding-bottom: calc(20px + var(--sab));
             text-align: center;
+            overflow-y: auto;
         }
 
         .hidden {
@@ -162,29 +184,29 @@
 
         .screen-title {
             color: #ffd700;
-            font-size: 32px;
+            font-size: 28px;
             text-shadow: 3px 3px 0 #8B4513;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .screen-subtitle {
             color: #fff;
-            font-size: 18px;
-            margin-bottom: 30px;
-            max-width: 300px;
+            font-size: 16px;
+            margin-bottom: 20px;
+            max-width: 280px;
         }
 
         .menu-btn {
             background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
             border: 3px solid #8B4513;
             border-radius: 15px;
-            padding: 15px 40px;
+            padding: 12px 30px;
             color: #8B4513;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            margin: 10px;
-            min-width: 200px;
+            margin: 8px;
+            min-width: 180px;
         }
 
         .menu-btn:active {
@@ -192,19 +214,19 @@
         }
 
         .cat-preview {
-            font-size: 80px;
-            margin-bottom: 20px;
+            font-size: 60px;
+            margin-bottom: 15px;
         }
 
         #minimap {
             position: absolute;
-            bottom: 100px;
-            right: 10px;
-            width: 120px;
-            height: 120px;
+            top: max(55px, calc(50px + var(--sat)));
+            right: max(5px, var(--sar));
+            width: 80px;
+            height: 80px;
             background: rgba(0, 0, 0, 0.7);
             border: 2px solid #ffd700;
-            border-radius: 10px;
+            border-radius: 8px;
             z-index: 100;
         }
 
@@ -212,23 +234,26 @@
             background: rgba(255, 255, 255, 0.1);
             border: 2px solid #ffd700;
             border-radius: 10px;
-            padding: 15px;
-            margin: 10px;
+            padding: 10px;
+            margin: 6px;
             color: #fff;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            min-width: 280px;
+            width: calc(100% - 20px);
+            max-width: 300px;
+            font-size: 14px;
         }
 
         .shop-btn {
             background: #ffd700;
             border: none;
             border-radius: 5px;
-            padding: 8px 15px;
+            padding: 6px 12px;
             color: #8B4513;
             font-weight: bold;
             cursor: pointer;
+            font-size: 12px;
         }
 
         .shop-btn:disabled {
@@ -238,50 +263,133 @@
 
         #notification {
             position: absolute;
-            top: 80px;
+            top: max(60px, calc(55px + var(--sat)));
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             border: 2px solid #ffd700;
-            border-radius: 10px;
-            padding: 10px 20px;
+            border-radius: 8px;
+            padding: 8px 15px;
             color: #ffd700;
-            font-size: 16px;
+            font-size: 14px;
             z-index: 150;
             transition: opacity 0.3s;
             text-align: center;
-            max-width: 90%;
+            max-width: 85%;
         }
 
         .crew-display {
             display: flex;
-            gap: 5px;
+            gap: 3px;
             flex-wrap: wrap;
-            max-width: 150px;
+            max-width: 100px;
         }
 
         .crew-cat {
-            font-size: 20px;
+            font-size: 16px;
         }
 
         #questPanel {
             position: absolute;
-            top: 80px;
-            left: 10px;
+            top: max(55px, calc(50px + var(--sat)));
+            left: max(5px, var(--sal));
             background: rgba(0, 0, 0, 0.7);
             border: 2px solid #ffd700;
-            border-radius: 10px;
-            padding: 10px;
+            border-radius: 8px;
+            padding: 6px 8px;
             color: #fff;
-            font-size: 12px;
-            max-width: 200px;
+            font-size: 10px;
+            max-width: 140px;
             z-index: 100;
         }
 
         .quest-title {
             color: #ffd700;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+
+        /* Larger screens */
+        @media (min-width: 500px) and (min-height: 700px) {
+            .control-btn {
+                width: 65px;
+                height: 65px;
+                font-size: 26px;
+            }
+            .action-btn {
+                width: 75px;
+                height: 75px;
+                font-size: 13px;
+            }
+            .ui-panel {
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+            #minimap {
+                width: 100px;
+                height: 100px;
+            }
+            #questPanel {
+                font-size: 12px;
+                max-width: 180px;
+            }
+            .screen-title {
+                font-size: 36px;
+            }
+            .cat-preview {
+                font-size: 80px;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-height: 550px) {
+            .control-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            .action-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 10px;
+            }
+            #minimap {
+                width: 60px;
+                height: 60px;
+            }
+            #questPanel {
+                display: none;
+            }
+            .ui-panel {
+                font-size: 10px;
+                padding: 4px 6px;
+            }
+        }
+
+        /* Landscape mode */
+        @media (orientation: landscape) and (max-height: 500px) {
+            #controls {
+                bottom: calc(8px + var(--sab));
+            }
+            .control-btn {
+                width: 45px;
+                height: 45px;
+                font-size: 18px;
+            }
+            .action-btn {
+                width: 55px;
+                height: 55px;
+            }
+            #questPanel {
+                display: none;
+            }
+            #minimap {
+                top: auto;
+                bottom: calc(80px + var(--sab));
+                width: 70px;
+                height: 70px;
+            }
         }
     </style>
 </head>
@@ -322,11 +430,9 @@
                     <div class="control-btn" id="btnRight">►</div>
                 </div>
             </div>
-            <div class="control-cluster">
-                <div class="control-row">
-                    <div class="action-btn" id="btnFire">🔥<br>FIRE</div>
-                    <div class="action-btn secondary" id="btnShop">🏪<br>SHOP</div>
-                </div>
+            <div class="action-cluster">
+                <div class="action-btn" id="btnFire">🔥 FIRE</div>
+                <div class="action-btn secondary" id="btnShop">🏪 SHOP</div>
             </div>
         </div>
 
@@ -412,6 +518,13 @@
             minimapCanvas = document.getElementById('minimap');
             minimapCtx = minimapCanvas.getContext('2d');
 
+            // Fix mobile viewport height (100vh bug)
+            setViewportHeight();
+            window.addEventListener('resize', setViewportHeight);
+            window.addEventListener('orientationchange', () => {
+                setTimeout(setViewportHeight, 100);
+            });
+
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
 
@@ -421,11 +534,20 @@
             // Start screen is shown by default
         }
 
+        function setViewportHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            minimapCanvas.width = 120;
-            minimapCanvas.height = 120;
+
+            // Responsive minimap size
+            const minimapSize = window.innerWidth < 400 ? 60 :
+                               window.innerWidth < 600 ? 80 : 100;
+            minimapCanvas.width = minimapSize;
+            minimapCanvas.height = minimapSize;
         }
 
         function setupControls() {
@@ -1312,10 +1434,11 @@
         }
 
         function drawMinimap() {
+            const mapSize = minimapCanvas.width;
             minimapCtx.fillStyle = '#0066AA';
-            minimapCtx.fillRect(0, 0, 120, 120);
+            minimapCtx.fillRect(0, 0, mapSize, mapSize);
 
-            const scale = 120 / WORLD_WIDTH;
+            const scale = mapSize / WORLD_WIDTH;
 
             // Islands
             islands.forEach(island => {
