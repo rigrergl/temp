@@ -18,12 +18,35 @@ Add this to your game prompts:
 
 Instructions for installing the [Playwright MCP](https://github.com/microsoft/playwright-mcp) server in Claude Code for browser automation.
 
-## Requirements
+## Quick Setup (Recommended)
+
+Use the automated installation script:
+
+```bash
+.claude/skills/setup/install-playwright-mcp.sh
+```
+
+This script handles everything automatically. After running, restart Claude Code and verify with:
+
+```bash
+claude mcp list
+```
+
+You should see `playwright` listed as a configured server.
+
+---
+
+## Manual Setup
+
+If you prefer manual installation or the script doesn't work, follow these steps:
+
+### Requirements
 
 - Node.js 18+ (check with `node --version`)
 - Claude Code
+- `jq` (for JSON manipulation)
 
-## Step 1: Install Playwright Browser
+### Step 1: Install Playwright Browser
 
 Run this command to install Chromium (required for the MCP server):
 
@@ -33,7 +56,7 @@ npx playwright install chromium
 
 This installs the browser to `~/.cache/ms-playwright/`.
 
-## Step 2: Configure Claude Code
+### Step 2: Configure Claude Code
 
 Add the Playwright MCP server to your Claude Code configuration. Edit `~/.claude.json` and add an `mcpServers` section at the root level:
 
@@ -81,7 +104,7 @@ Common flags you can add to the `args` array:
 }
 ```
 
-## Step 3: Restart Claude Code
+### Step 3: Restart Claude Code
 
 After editing the configuration, restart Claude Code for the MCP server to load. The Playwright tools will then be available with the `mcp__playwright__` prefix.
 
