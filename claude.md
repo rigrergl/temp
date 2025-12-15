@@ -18,14 +18,32 @@ Add this to your game prompts:
 
 Instructions for installing the [Playwright MCP](https://github.com/microsoft/playwright-mcp) server in Claude Code for browser automation.
 
-## Requirements
+## Quick Setup (Automated)
+
+Use the **setup skill** for automated installation:
+
+```bash
+# Run the installation script
+bash .claude/skills/setup/install-playwright-mcp.sh
+```
+
+Or invoke the skill: `/skill setup`
+
+The script will:
+1. Verify Node.js 18+ is installed
+2. Install Playwright Chromium browser
+3. Configure Claude Code with the MCP server
+4. Verify the installation
+
+## Manual Setup
+
+### Requirements
 
 - Node.js 18+ (check with `node --version`)
+- jq (for JSON manipulation)
 - Claude Code
 
-## Step 1: Install Playwright Browser
-
-Run this command to install Chromium (required for the MCP server):
+### Step 1: Install Playwright Browser
 
 ```bash
 npx playwright install chromium
@@ -33,9 +51,20 @@ npx playwright install chromium
 
 This installs the browser to `~/.cache/ms-playwright/`.
 
-## Step 2: Configure Claude Code
+### Step 2: Configure Claude Code
 
-Add the Playwright MCP server to your Claude Code configuration. Edit `~/.claude.json` and add an `mcpServers` section at the root level:
+Add the Playwright MCP server to `~/.claude.json`:
+
+```bash
+# Using jq (recommended)
+jq '.mcpServers.playwright = {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@playwright/mcp@latest", "--headless"]
+}' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
+```
+
+Or manually edit `~/.claude.json`:
 
 ```json
 {
@@ -49,9 +78,17 @@ Add the Playwright MCP server to your Claude Code configuration. Edit `~/.claude
 }
 ```
 
-### Configuration Options
+### Step 3: Restart Claude Code
 
-Common flags you can add to the `args` array:
+Restart Claude Code for the MCP server to load.
+
+### Step 4: Verify Installation
+
+```bash
+claude mcp list
+```
+
+## Configuration Options
 
 | Flag | Description |
 |------|-------------|
@@ -62,32 +99,9 @@ Common flags you can add to the `args` array:
 | `--user-data-dir /path/to/profile` | Persist browser data between sessions |
 | `--isolated` | Keep browser profile in memory only |
 
-### Example with Multiple Options
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest",
-        "--headless",
-        "--viewport-size", "1280x720"
-      ]
-    }
-  }
-}
-```
-
-## Step 3: Restart Claude Code
-
-After editing the configuration, restart Claude Code for the MCP server to load. The Playwright tools will then be available with the `mcp__playwright__` prefix.
-
 ## Available Tools
 
-Once configured, you'll have access to browser automation tools including:
+Once configured, you'll have access to:
 
 - `mcp__playwright__browser_navigate` - Navigate to URLs
 - `mcp__playwright__browser_click` - Click elements
@@ -99,9 +113,13 @@ Once configured, you'll have access to browser automation tools including:
 
 **Server not loading?**
 - Verify Node.js version: `node --version` (must be 18+)
-- Check the config file is valid JSON: `cat ~/.claude.json | python3 -m json.tool`
+- Check config is valid JSON: `cat ~/.claude.json | python3 -m json.tool`
 - Ensure Playwright browsers are installed: `npx playwright install chromium`
 
 **Browser issues?**
 - For VMs/servers without displays, always use `--headless`
-- If using `--no-sandbox`, be aware of security implications
+
+**`claude mcp list` hangs?**
+- This can happen in some environments where MCP initialization takes time
+- Verify config: `jq '.mcpServers' ~/.claude.json`
+- Restart Claude Code and wait for MCP servers to initialize
