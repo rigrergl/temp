@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Pirate Cats: Ocean Adventures</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(180deg, #87CEEB 0%, #1E90FF 50%, #0066AA 100%);
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .ui-panel {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 14px;
+            pointer-events: auto;
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 3px 0;
+        }
+
+        .stat-icon {
+            font-size: 16px;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .control-cluster {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            pointer-events: auto;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 215, 0, 0.8);
+            border: 3px solid #8B4513;
+            color: #8B4513;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .control-btn:active {
+            background: rgba(255, 180, 0, 1);
+            transform: scale(0.95);
+        }
+
+        .action-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(220, 20, 60, 0.9);
+            border: 3px solid #8B0000;
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .action-btn:active {
+            background: rgba(180, 20, 60, 1);
+            transform: scale(0.95);
+        }
+
+        .action-btn.secondary {
+            background: rgba(30, 144, 255, 0.9);
+            border-color: #0066AA;
+        }
+
+        #startScreen, #gameOverScreen, #shopScreen, #victoryScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .screen-title {
+            color: #ffd700;
+            font-size: 32px;
+            text-shadow: 3px 3px 0 #8B4513;
+            margin-bottom: 20px;
+        }
+
+        .screen-subtitle {
+            color: #fff;
+            font-size: 18px;
+            margin-bottom: 30px;
+            max-width: 300px;
+        }
+
+        .menu-btn {
+            background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
+            border: 3px solid #8B4513;
+            border-radius: 15px;
+            padding: 15px 40px;
+            color: #8B4513;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            min-width: 200px;
+        }
+
+        .menu-btn:active {
+            transform: scale(0.95);
+        }
+
+        .cat-preview {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+
+        #minimap {
+            position: absolute;
+            bottom: 100px;
+            right: 10px;
+            width: 120px;
+            height: 120px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            z-index: 100;
+        }
+
+        .shop-item {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 280px;
+        }
+
+        .shop-btn {
+            background: #ffd700;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            color: #8B4513;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .shop-btn:disabled {
+            background: #666;
+            color: #999;
+        }
+
+        #notification {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 10px 20px;
+            color: #ffd700;
+            font-size: 16px;
+            z-index: 150;
+            transition: opacity 0.3s;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        .crew-display {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            max-width: 150px;
+        }
+
+        .crew-cat {
+            font-size: 20px;
+        }
+
+        #questPanel {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 10px;
+            color: #fff;
+            font-size: 12px;
+            max-width: 200px;
+            z-index: 100;
+        }
+
+        .quest-title {
+            color: #ffd700;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="ui">
+            <div class="ui-panel">
+                <div class="stat"><span class="stat-icon">💰</span> <span id="gold">0</span></div>
+                <div class="stat"><span class="stat-icon">❤️</span> <span id="health">100</span>/100</div>
+                <div class="stat"><span class="stat-icon">⚓</span> <span id="shipName">Tiny Dinghy</span></div>
+            </div>
+            <div class="ui-panel">
+                <div class="stat"><span class="stat-icon">🐱</span> Crew: <span id="crewCount">1</span></div>
+                <div class="crew-display" id="crewDisplay"></div>
+            </div>
+        </div>
+
+        <div id="questPanel">
+            <div class="quest-title">🗺️ Current Quest</div>
+            <div id="questText">Find the legendary treasure!</div>
+            <div id="questProgress"></div>
+        </div>
+
+        <canvas id="minimap"></canvas>
+
+        <div id="notification" class="hidden"></div>
+
+        <div id="controls">
+            <div class="control-cluster">
+                <div class="control-row">
+                    <div class="control-btn" id="btnUp">▲</div>
+                </div>
+                <div class="control-row">
+                    <div class="control-btn" id="btnLeft">◄</div>
+                    <div class="control-btn" id="btnDown">▼</div>
+                    <div class="control-btn" id="btnRight">►</div>
+                </div>
+            </div>
+            <div class="control-cluster">
+                <div class="control-row">
+                    <div class="action-btn" id="btnFire">🔥<br>FIRE</div>
+                    <div class="action-btn secondary" id="btnShop">🏪<br>SHOP</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="startScreen">
+            <div class="cat-preview">🐱🏴‍☠️</div>
+            <h1 class="screen-title">PIRATE CATS</h1>
+            <p class="screen-subtitle">Sail the seven seas, collect treasure, battle enemy pirates, and become the greatest cat captain!</p>
+            <button class="menu-btn" id="startBtn">Set Sail! ⛵</button>
+        </div>
+
+        <div id="gameOverScreen" class="hidden">
+            <div class="cat-preview">😿💀</div>
+            <h1 class="screen-title">SHIP SUNK!</h1>
+            <p class="screen-subtitle">Your ship has been destroyed! Final treasure: <span id="finalGold">0</span> gold</p>
+            <button class="menu-btn" id="restartBtn">Try Again 🏴‍☠️</button>
+        </div>
+
+        <div id="victoryScreen" class="hidden">
+            <div class="cat-preview">🐱👑🏆</div>
+            <h1 class="screen-title">LEGENDARY CAPTAIN!</h1>
+            <p class="screen-subtitle">You found all legendary treasures and became the Pirate King of Cats!</p>
+            <p class="screen-subtitle">Total Gold: <span id="victoryGold">0</span></p>
+            <button class="menu-btn" id="newGameBtn">New Adventure 🌊</button>
+        </div>
+
+        <div id="shopScreen" class="hidden">
+            <h1 class="screen-title">🏪 Port Shop</h1>
+            <p class="screen-subtitle">Upgrade your ship and hire crew!</p>
+            <div id="shopItems"></div>
+            <button class="menu-btn" id="closeShopBtn">Back to Sea 🌊</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Constants
+        const WORLD_WIDTH = 3000;
+        const WORLD_HEIGHT = 3000;
+        const TILE_SIZE = 50;
+
+        // Cat Pirate Names
+        const CAT_NAMES = [
+            "Captain Whiskers", "Salty Paws", "Blackbeard Meow", "One-Eye Pete",
+            "Scurvy Sam", "Patches O'Furry", "Barnacle Bill", "Cutlass Kate",
+            "Rum Runner Rex", "Treasure Tom", "Sea Legs Sally", "Anchor Annie"
+        ];
+
+        // Human Pirate Names
+        const HUMAN_NAMES = [
+            "Mad Jack", "Dirty Dan", "Scarface Steve", "Pegleg Pete",
+            "Iron Hook Harry", "Bloody Mary", "Storm Chaser", "Ghost Ship Gary"
+        ];
+
+        // Ship Types
+        const SHIPS = {
+            dinghy: { name: "Tiny Dinghy", speed: 2, health: 100, cannons: 1, cost: 0, size: 30 },
+            sloop: { name: "Swift Sloop", speed: 3, health: 150, cannons: 2, cost: 500, size: 40 },
+            brigantine: { name: "Brave Brigantine", speed: 2.5, health: 250, cannons: 4, cost: 1500, size: 50 },
+            galleon: { name: "Grand Galleon", speed: 2, health: 400, cannons: 8, cost: 4000, size: 70 },
+            warship: { name: "Royal Warship", speed: 2.5, health: 600, cannons: 12, cost: 10000, size: 90 }
+        };
+
+        // Game State
+        let canvas, ctx, minimapCanvas, minimapCtx;
+        let gameRunning = false;
+        let player = null;
+        let enemies = [];
+        let treasures = [];
+        let islands = [];
+        let cannonballs = [];
+        let particles = [];
+        let floatingTexts = [];
+        let camera = { x: 0, y: 0 };
+        let keys = {};
+        let touchControls = { up: false, down: false, left: false, right: false };
+        let lastTime = 0;
+        let legendaryTreasuresFound = 0;
+        const LEGENDARY_TREASURES_NEEDED = 5;
+
+        // Initialize
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            minimapCanvas = document.getElementById('minimap');
+            minimapCtx = minimapCanvas.getContext('2d');
+
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            setupControls();
+            setupMenus();
+
+            // Start screen is shown by default
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            minimapCanvas.width = 120;
+            minimapCanvas.height = 120;
+        }
+
+        function setupControls() {
+            // Keyboard
+            document.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                if (e.key === ' ') fireCannon();
+            });
+            document.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+            // Touch Controls
+            const btnUp = document.getElementById('btnUp');
+            const btnDown = document.getElementById('btnDown');
+            const btnLeft = document.getElementById('btnLeft');
+            const btnRight = document.getElementById('btnRight');
+            const btnFire = document.getElementById('btnFire');
+            const btnShop = document.getElementById('btnShop');
+
+            // Touch event handlers
+            const addTouchControl = (btn, dir) => {
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); touchControls[dir] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); touchControls[dir] = false; });
+                btn.addEventListener('mousedown', () => touchControls[dir] = true);
+                btn.addEventListener('mouseup', () => touchControls[dir] = false);
+                btn.addEventListener('mouseleave', () => touchControls[dir] = false);
+            };
+
+            addTouchControl(btnUp, 'up');
+            addTouchControl(btnDown, 'down');
+            addTouchControl(btnLeft, 'left');
+            addTouchControl(btnRight, 'right');
+
+            btnFire.addEventListener('touchstart', (e) => { e.preventDefault(); fireCannon(); });
+            btnFire.addEventListener('click', fireCannon);
+
+            btnShop.addEventListener('touchstart', (e) => { e.preventDefault(); openShop(); });
+            btnShop.addEventListener('click', openShop);
+        }
+
+        function setupMenus() {
+            document.getElementById('startBtn').addEventListener('click', startGame);
+            document.getElementById('restartBtn').addEventListener('click', startGame);
+            document.getElementById('newGameBtn').addEventListener('click', startGame);
+            document.getElementById('closeShopBtn').addEventListener('click', closeShop);
+        }
+
+        function startGame() {
+            // Hide all screens
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('victoryScreen').classList.add('hidden');
+            document.getElementById('shopScreen').classList.add('hidden');
+
+            // Reset game state
+            legendaryTreasuresFound = 0;
+
+            // Create player
+            player = {
+                x: WORLD_WIDTH / 2,
+                y: WORLD_HEIGHT / 2,
+                angle: 0,
+                ship: {...SHIPS.dinghy},
+                shipType: 'dinghy',
+                health: SHIPS.dinghy.health,
+                maxHealth: SHIPS.dinghy.health,
+                gold: 0,
+                crew: [{ name: "Captain Whiskers", type: "captain" }],
+                cannonCooldown: 0,
+                invincible: 0
+            };
+
+            // Generate world
+            generateIslands();
+            generateTreasures();
+            generateEnemies();
+
+            // Clear projectiles and effects
+            cannonballs = [];
+            particles = [];
+            floatingTexts = [];
+
+            gameRunning = true;
+            updateUI();
+            updateQuest();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function generateIslands() {
+            islands = [];
+            const islandCount = 20;
+
+            for (let i = 0; i < islandCount; i++) {
+                const island = {
+                    x: Math.random() * (WORLD_WIDTH - 400) + 200,
+                    y: Math.random() * (WORLD_HEIGHT - 400) + 200,
+                    radius: 80 + Math.random() * 100,
+                    hasShop: i < 3,
+                    hasTavern: i >= 3 && i < 6,
+                    trees: [],
+                    palmCount: Math.floor(Math.random() * 5) + 3
+                };
+
+                // Generate palm tree positions
+                for (let j = 0; j < island.palmCount; j++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = Math.random() * (island.radius - 30);
+                    island.trees.push({
+                        x: Math.cos(angle) * dist,
+                        y: Math.sin(angle) * dist
+                    });
+                }
+
+                islands.push(island);
+            }
+        }
+
+        function generateTreasures() {
+            treasures = [];
+
+            // Regular treasures
+            for (let i = 0; i < 30; i++) {
+                treasures.push({
+                    x: Math.random() * WORLD_WIDTH,
+                    y: Math.random() * WORLD_HEIGHT,
+                    value: Math.floor(Math.random() * 100) + 50,
+                    type: 'normal',
+                    bobOffset: Math.random() * Math.PI * 2
+                });
+            }
+
+            // Legendary treasures (5 total needed to win)
+            for (let i = 0; i < LEGENDARY_TREASURES_NEEDED; i++) {
+                treasures.push({
+                    x: Math.random() * WORLD_WIDTH,
+                    y: Math.random() * WORLD_HEIGHT,
+                    value: 1000,
+                    type: 'legendary',
+                    bobOffset: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        function generateEnemies() {
+            enemies = [];
+
+            // Cat pirates
+            for (let i = 0; i < 8; i++) {
+                const shipTypes = ['dinghy', 'sloop', 'brigantine'];
+                const shipType = shipTypes[Math.floor(Math.random() * shipTypes.length)];
+                enemies.push(createEnemy('cat', shipType));
+            }
+
+            // Human pirates (tougher)
+            for (let i = 0; i < 5; i++) {
+                const shipTypes = ['sloop', 'brigantine', 'galleon'];
+                const shipType = shipTypes[Math.floor(Math.random() * shipTypes.length)];
+                enemies.push(createEnemy('human', shipType));
+            }
+        }
+
+        function createEnemy(type, shipType) {
+            const ship = {...SHIPS[shipType]};
+            return {
+                x: Math.random() * WORLD_WIDTH,
+                y: Math.random() * WORLD_HEIGHT,
+                angle: Math.random() * Math.PI * 2,
+                ship: ship,
+                shipType: shipType,
+                health: ship.health,
+                maxHealth: ship.health,
+                type: type,
+                name: type === 'cat'
+                    ? CAT_NAMES[Math.floor(Math.random() * CAT_NAMES.length)]
+                    : HUMAN_NAMES[Math.floor(Math.random() * HUMAN_NAMES.length)],
+                state: 'patrol',
+                targetX: Math.random() * WORLD_WIDTH,
+                targetY: Math.random() * WORLD_HEIGHT,
+                cannonCooldown: 0,
+                detectionRange: 300,
+                crew: Math.floor(Math.random() * 3) + 1
+            };
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            const deltaTime = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+
+            update(deltaTime);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function update(dt) {
+            // Update player
+            updatePlayer(dt);
+
+            // Update enemies
+            enemies.forEach(enemy => updateEnemy(enemy, dt));
+
+            // Update cannonballs
+            updateCannonballs(dt);
+
+            // Update particles
+            updateParticles(dt);
+
+            // Update floating texts
+            updateFloatingTexts(dt);
+
+            // Check collisions
+            checkCollisions();
+
+            // Update camera
+            camera.x = player.x - canvas.width / 2;
+            camera.y = player.y - canvas.height / 2;
+
+            // Respawn treasures if too few
+            if (treasures.filter(t => t.type === 'normal').length < 10) {
+                for (let i = 0; i < 5; i++) {
+                    treasures.push({
+                        x: Math.random() * WORLD_WIDTH,
+                        y: Math.random() * WORLD_HEIGHT,
+                        value: Math.floor(Math.random() * 100) + 50,
+                        type: 'normal',
+                        bobOffset: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+
+            // Respawn enemies
+            if (enemies.length < 8) {
+                const types = ['cat', 'human'];
+                const shipTypes = ['dinghy', 'sloop', 'brigantine'];
+                enemies.push(createEnemy(
+                    types[Math.floor(Math.random() * types.length)],
+                    shipTypes[Math.floor(Math.random() * shipTypes.length)]
+                ));
+            }
+
+            // Check victory
+            if (legendaryTreasuresFound >= LEGENDARY_TREASURES_NEEDED) {
+                victory();
+            }
+        }
+
+        function updatePlayer(dt) {
+            // Movement
+            let dx = 0, dy = 0;
+
+            if (keys['w'] || keys['arrowup'] || touchControls.up) dy -= 1;
+            if (keys['s'] || keys['arrowdown'] || touchControls.down) dy += 1;
+            if (keys['a'] || keys['arrowleft'] || touchControls.left) dx -= 1;
+            if (keys['d'] || keys['arrowright'] || touchControls.right) dx += 1;
+
+            if (dx !== 0 || dy !== 0) {
+                const targetAngle = Math.atan2(dy, dx);
+                const angleDiff = targetAngle - player.angle;
+                const normalizedDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+                player.angle += normalizedDiff * 3 * dt;
+
+                const speed = player.ship.speed * 50;
+                player.x += Math.cos(player.angle) * speed * dt;
+                player.y += Math.sin(player.angle) * speed * dt;
+            }
+
+            // Keep in bounds
+            player.x = Math.max(50, Math.min(WORLD_WIDTH - 50, player.x));
+            player.y = Math.max(50, Math.min(WORLD_HEIGHT - 50, player.y));
+
+            // Cooldowns
+            if (player.cannonCooldown > 0) player.cannonCooldown -= dt;
+            if (player.invincible > 0) player.invincible -= dt;
+
+            // Crew bonuses
+            const healers = player.crew.filter(c => c.type === 'medic').length;
+            if (healers > 0 && player.health < player.maxHealth) {
+                player.health = Math.min(player.maxHealth, player.health + healers * 2 * dt);
+            }
+        }
+
+        function updateEnemy(enemy, dt) {
+            const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+
+            // AI behavior
+            if (distToPlayer < enemy.detectionRange) {
+                enemy.state = 'chase';
+                enemy.targetX = player.x;
+                enemy.targetY = player.y;
+            } else if (enemy.state === 'chase' && distToPlayer > enemy.detectionRange * 1.5) {
+                enemy.state = 'patrol';
+                enemy.targetX = Math.random() * WORLD_WIDTH;
+                enemy.targetY = Math.random() * WORLD_HEIGHT;
+            }
+
+            // Move towards target
+            const dx = enemy.targetX - enemy.x;
+            const dy = enemy.targetY - enemy.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > 50) {
+                const targetAngle = Math.atan2(dy, dx);
+                const angleDiff = targetAngle - enemy.angle;
+                const normalizedDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+                enemy.angle += normalizedDiff * 2 * dt;
+
+                const speed = enemy.ship.speed * 40;
+                enemy.x += Math.cos(enemy.angle) * speed * dt;
+                enemy.y += Math.sin(enemy.angle) * speed * dt;
+            } else if (enemy.state === 'patrol') {
+                enemy.targetX = Math.random() * WORLD_WIDTH;
+                enemy.targetY = Math.random() * WORLD_HEIGHT;
+            }
+
+            // Fire at player if in range
+            if (enemy.state === 'chase' && distToPlayer < 200 && enemy.cannonCooldown <= 0) {
+                fireEnemyCannon(enemy);
+                enemy.cannonCooldown = 2 + Math.random();
+            }
+
+            if (enemy.cannonCooldown > 0) enemy.cannonCooldown -= dt;
+
+            // Keep in bounds
+            enemy.x = Math.max(50, Math.min(WORLD_WIDTH - 50, enemy.x));
+            enemy.y = Math.max(50, Math.min(WORLD_HEIGHT - 50, enemy.y));
+        }
+
+        function fireCannon() {
+            if (!gameRunning || player.cannonCooldown > 0) return;
+
+            const cannons = player.ship.cannons + player.crew.filter(c => c.type === 'gunner').length;
+
+            for (let i = 0; i < cannons; i++) {
+                const spread = (i - (cannons - 1) / 2) * 0.2;
+                cannonballs.push({
+                    x: player.x + Math.cos(player.angle) * 30,
+                    y: player.y + Math.sin(player.angle) * 30,
+                    vx: Math.cos(player.angle + spread) * 400,
+                    vy: Math.sin(player.angle + spread) * 400,
+                    isPlayer: true,
+                    damage: 20 + player.crew.filter(c => c.type === 'gunner').length * 5
+                });
+            }
+
+            player.cannonCooldown = 0.5;
+            createParticles(player.x, player.y, '#ff6600', 5);
+        }
+
+        function fireEnemyCannon(enemy) {
+            const angleToPlayer = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+
+            for (let i = 0; i < enemy.ship.cannons; i++) {
+                const spread = (i - (enemy.ship.cannons - 1) / 2) * 0.15;
+                cannonballs.push({
+                    x: enemy.x + Math.cos(angleToPlayer) * 30,
+                    y: enemy.y + Math.sin(angleToPlayer) * 30,
+                    vx: Math.cos(angleToPlayer + spread) * 300,
+                    vy: Math.sin(angleToPlayer + spread) * 300,
+                    isPlayer: false,
+                    damage: 15
+                });
+            }
+
+            createParticles(enemy.x, enemy.y, '#ff6600', 3);
+        }
+
+        function updateCannonballs(dt) {
+            for (let i = cannonballs.length - 1; i >= 0; i--) {
+                const ball = cannonballs[i];
+                ball.x += ball.vx * dt;
+                ball.y += ball.vy * dt;
+
+                // Remove if out of world
+                if (ball.x < 0 || ball.x > WORLD_WIDTH || ball.y < 0 || ball.y > WORLD_HEIGHT) {
+                    cannonballs.splice(i, 1);
+                    continue;
+                }
+
+                // Check island collision
+                for (const island of islands) {
+                    if (Math.hypot(ball.x - island.x, ball.y - island.y) < island.radius) {
+                        createParticles(ball.x, ball.y, '#8B4513', 5);
+                        cannonballs.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function updateFloatingTexts(dt) {
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 50 * dt;
+                ft.life -= dt;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 200,
+                    vy: (Math.random() - 0.5) * 200,
+                    color: color,
+                    life: 0.5 + Math.random() * 0.5
+                });
+            }
+        }
+
+        function createFloatingText(x, y, text, color) {
+            floatingTexts.push({ x, y, text, color, life: 1.5 });
+        }
+
+        function checkCollisions() {
+            // Cannonball collisions
+            for (let i = cannonballs.length - 1; i >= 0; i--) {
+                const ball = cannonballs[i];
+
+                if (ball.isPlayer) {
+                    // Check enemy hits
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const enemy = enemies[j];
+                        if (Math.hypot(ball.x - enemy.x, ball.y - enemy.y) < enemy.ship.size) {
+                            enemy.health -= ball.damage;
+                            createParticles(ball.x, ball.y, '#ff0000', 10);
+                            cannonballs.splice(i, 1);
+
+                            if (enemy.health <= 0) {
+                                // Enemy defeated
+                                const goldReward = Math.floor(enemy.maxHealth * 2 + Math.random() * 100);
+                                player.gold += goldReward;
+                                createFloatingText(enemy.x, enemy.y, `+${goldReward} 💰`, '#ffd700');
+                                createParticles(enemy.x, enemy.y, '#8B4513', 30);
+                                showNotification(`Defeated ${enemy.name}! +${goldReward} gold`);
+
+                                // Chance to recruit crew
+                                if (Math.random() < 0.3 && player.crew.length < 10) {
+                                    const crewTypes = ['sailor', 'gunner', 'medic'];
+                                    const newCrew = {
+                                        name: CAT_NAMES[Math.floor(Math.random() * CAT_NAMES.length)],
+                                        type: crewTypes[Math.floor(Math.random() * crewTypes.length)]
+                                    };
+                                    player.crew.push(newCrew);
+                                    showNotification(`${newCrew.name} joined your crew as ${newCrew.type}!`);
+                                }
+
+                                enemies.splice(j, 1);
+                            }
+                            break;
+                        }
+                    }
+                } else {
+                    // Check player hit
+                    if (player.invincible <= 0 &&
+                        Math.hypot(ball.x - player.x, ball.y - player.y) < player.ship.size) {
+                        const damage = Math.max(1, ball.damage - player.crew.filter(c => c.type === 'sailor').length * 2);
+                        player.health -= damage;
+                        createParticles(ball.x, ball.y, '#ff0000', 10);
+                        cannonballs.splice(i, 1);
+                        player.invincible = 0.5;
+
+                        if (player.health <= 0) {
+                            gameOver();
+                        }
+                    }
+                }
+            }
+
+            // Treasure collection
+            for (let i = treasures.length - 1; i >= 0; i--) {
+                const treasure = treasures[i];
+                if (Math.hypot(treasure.x - player.x, treasure.y - player.y) < 40) {
+                    player.gold += treasure.value;
+                    createFloatingText(treasure.x, treasure.y, `+${treasure.value} 💰`, '#ffd700');
+                    createParticles(treasure.x, treasure.y, '#ffd700', 15);
+
+                    if (treasure.type === 'legendary') {
+                        legendaryTreasuresFound++;
+                        showNotification(`LEGENDARY TREASURE! (${legendaryTreasuresFound}/${LEGENDARY_TREASURES_NEEDED})`);
+                        updateQuest();
+                    }
+
+                    treasures.splice(i, 1);
+                }
+            }
+
+            // Island collision (slow down near shores)
+            for (const island of islands) {
+                const dist = Math.hypot(player.x - island.x, player.y - island.y);
+                if (dist < island.radius + 20) {
+                    const angle = Math.atan2(player.y - island.y, player.x - island.x);
+                    player.x = island.x + Math.cos(angle) * (island.radius + 25);
+                    player.y = island.y + Math.sin(angle) * (island.radius + 25);
+                }
+            }
+
+            updateUI();
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw ocean background with waves
+            drawOcean();
+
+            // Draw islands
+            islands.forEach(island => drawIsland(island));
+
+            // Draw treasures
+            treasures.forEach(treasure => drawTreasure(treasure));
+
+            // Draw enemies
+            enemies.forEach(enemy => drawShip(enemy, false));
+
+            // Draw player
+            drawShip(player, true);
+
+            // Draw cannonballs
+            cannonballs.forEach(ball => {
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(ball.x - camera.x, ball.y - camera.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Draw particles
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x - camera.x, p.y - camera.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            // Draw floating texts
+            floatingTexts.forEach(ft => {
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = ft.life;
+                ctx.fillText(ft.text, ft.x - camera.x, ft.y - camera.y);
+            });
+            ctx.globalAlpha = 1;
+
+            // Draw minimap
+            drawMinimap();
+        }
+
+        function drawOcean() {
+            // Ocean gradient already set as canvas background
+            // Draw wave patterns
+            const time = Date.now() / 1000;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 2;
+
+            for (let y = -50; y < canvas.height + 50; y += 80) {
+                ctx.beginPath();
+                for (let x = 0; x < canvas.width; x += 10) {
+                    const worldX = x + camera.x;
+                    const worldY = y + camera.y;
+                    const wave = Math.sin(worldX * 0.02 + time) * 10 + Math.sin(worldY * 0.01 + time * 0.5) * 5;
+                    if (x === 0) ctx.moveTo(x, y + wave);
+                    else ctx.lineTo(x, y + wave);
+                }
+                ctx.stroke();
+            }
+        }
+
+        function drawIsland(island) {
+            const sx = island.x - camera.x;
+            const sy = island.y - camera.y;
+
+            // Skip if off screen
+            if (sx < -island.radius * 2 || sx > canvas.width + island.radius * 2 ||
+                sy < -island.radius * 2 || sy > canvas.height + island.radius * 2) return;
+
+            // Beach/sand
+            ctx.fillStyle = '#f4d03f';
+            ctx.beginPath();
+            ctx.arc(sx, sy, island.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Grass center
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.arc(sx, sy, island.radius * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Palm trees
+            island.trees.forEach(tree => {
+                const tx = sx + tree.x;
+                const ty = sy + tree.y;
+
+                // Trunk
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(tx - 3, ty - 20, 6, 25);
+
+                // Leaves
+                ctx.fillStyle = '#228B22';
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.ellipse(tx + Math.cos(i * 1.2) * 12, ty - 20 + Math.sin(i * 1.2) * 8, 15, 5, i * 1.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            // Shop icon
+            if (island.hasShop) {
+                ctx.font = '30px Arial';
+                ctx.fillText('🏪', sx - 15, sy + 10);
+            }
+
+            // Tavern icon
+            if (island.hasTavern) {
+                ctx.font = '30px Arial';
+                ctx.fillText('🍺', sx - 15, sy + 10);
+            }
+        }
+
+        function drawTreasure(treasure) {
+            const sx = treasure.x - camera.x;
+            const sy = treasure.y - camera.y;
+
+            if (sx < -30 || sx > canvas.width + 30 || sy < -30 || sy > canvas.height + 30) return;
+
+            const bob = Math.sin(Date.now() / 300 + treasure.bobOffset) * 5;
+
+            ctx.font = treasure.type === 'legendary' ? '35px Arial' : '25px Arial';
+            ctx.fillText(treasure.type === 'legendary' ? '👑' : '💰', sx - 12, sy + bob);
+
+            if (treasure.type === 'legendary') {
+                // Glow effect
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx, sy + bob - 10, 25 + Math.sin(Date.now() / 200) * 5, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function drawShip(entity, isPlayer) {
+            const sx = entity.x - camera.x;
+            const sy = entity.y - camera.y;
+
+            if (sx < -100 || sx > canvas.width + 100 || sy < -100 || sy > canvas.height + 100) return;
+
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(entity.angle + Math.PI / 2);
+
+            const size = entity.ship.size;
+
+            // Ship hull
+            ctx.fillStyle = isPlayer ? '#8B4513' : (entity.type === 'cat' ? '#654321' : '#4a4a4a');
+            ctx.beginPath();
+            ctx.moveTo(0, -size);
+            ctx.lineTo(size * 0.6, size * 0.3);
+            ctx.lineTo(size * 0.4, size * 0.8);
+            ctx.lineTo(-size * 0.4, size * 0.8);
+            ctx.lineTo(-size * 0.6, size * 0.3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Mast
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(-3, -size * 0.5, 6, size);
+
+            // Sail
+            ctx.fillStyle = isPlayer ? '#fff' : (entity.type === 'cat' ? '#ddd' : '#8B0000');
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 0.5);
+            ctx.lineTo(size * 0.5, 0);
+            ctx.lineTo(0, size * 0.3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Skull and crossbones on sail (for enemies)
+            if (!isPlayer) {
+                ctx.fillStyle = '#000';
+                ctx.font = `${size * 0.4}px Arial`;
+                ctx.fillText('☠️', -size * 0.15, size * 0.1);
+            }
+
+            ctx.restore();
+
+            // Draw cat captain with pirate hat
+            drawPirateCat(sx, sy, entity, isPlayer);
+
+            // Health bar
+            if (!isPlayer || entity.health < entity.maxHealth) {
+                const barWidth = size * 1.5;
+                const barHeight = 6;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(sx - barWidth / 2, sy - size - 15, barWidth, barHeight);
+                ctx.fillStyle = entity.health > entity.maxHealth * 0.3 ? '#2ecc71' : '#e74c3c';
+                ctx.fillRect(sx - barWidth / 2, sy - size - 15, barWidth * (entity.health / entity.maxHealth), barHeight);
+            }
+
+            // Enemy name
+            if (!isPlayer) {
+                ctx.fillStyle = entity.type === 'cat' ? '#ffd700' : '#ff6666';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(entity.name, sx, sy - size - 20);
+            }
+
+            // Invincibility flash
+            if (isPlayer && player.invincible > 0) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(sx, sy, size + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function drawPirateCat(sx, sy, entity, isPlayer) {
+            const size = entity.ship.size * 0.4;
+
+            // Cat face
+            ctx.fillStyle = isPlayer ? '#ffa500' : (entity.type === 'cat' ? '#888' : '#ffd5b5');
+            ctx.beginPath();
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Ears (only for cats)
+            if (isPlayer || entity.type === 'cat') {
+                ctx.fillStyle = isPlayer ? '#ffa500' : '#888';
+                ctx.beginPath();
+                ctx.moveTo(sx - size * 0.8, sy - size * 0.3);
+                ctx.lineTo(sx - size * 0.4, sy - size * 1.2);
+                ctx.lineTo(sx - size * 0.1, sy - size * 0.5);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(sx + size * 0.8, sy - size * 0.3);
+                ctx.lineTo(sx + size * 0.4, sy - size * 1.2);
+                ctx.lineTo(sx + size * 0.1, sy - size * 0.5);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner ears
+                ctx.fillStyle = '#ffb6c1';
+                ctx.beginPath();
+                ctx.moveTo(sx - size * 0.6, sy - size * 0.5);
+                ctx.lineTo(sx - size * 0.4, sy - size * 0.95);
+                ctx.lineTo(sx - size * 0.2, sy - size * 0.55);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(sx + size * 0.6, sy - size * 0.5);
+                ctx.lineTo(sx + size * 0.4, sy - size * 0.95);
+                ctx.lineTo(sx + size * 0.2, sy - size * 0.55);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // PIRATE HAT - Very Important!
+            ctx.fillStyle = '#1a1a1a';
+            // Hat base
+            ctx.beginPath();
+            ctx.ellipse(sx, sy - size * 0.6, size * 1.3, size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hat top (tricorn style)
+            ctx.beginPath();
+            ctx.moveTo(sx - size * 1.2, sy - size * 0.6);
+            ctx.lineTo(sx - size * 0.3, sy - size * 1.8);
+            ctx.lineTo(sx, sy - size * 1.2);
+            ctx.lineTo(sx + size * 0.3, sy - size * 1.8);
+            ctx.lineTo(sx + size * 1.2, sy - size * 0.6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Skull on hat
+            ctx.fillStyle = '#fff';
+            ctx.font = `${size * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText('☠️', sx, sy - size * 1.1);
+
+            // Eyes
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.ellipse(sx - size * 0.35, sy - size * 0.1, size * 0.25, size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(sx + size * 0.35, sy - size * 0.1, size * 0.25, size * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pupils
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(sx - size * 0.35, sy - size * 0.05, size * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(sx + size * 0.35, sy - size * 0.05, size * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye patch for some enemies
+            if (!isPlayer && entity.name.includes('One-Eye')) {
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.ellipse(sx + size * 0.35, sy - size * 0.1, size * 0.3, size * 0.35, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(sx + size * 0.6, sy - size * 0.3);
+                ctx.lineTo(sx + size * 0.9, sy - size * 0.7);
+                ctx.stroke();
+            }
+
+            // Cat nose
+            if (isPlayer || entity.type === 'cat') {
+                ctx.fillStyle = '#ff69b4';
+                ctx.beginPath();
+                ctx.moveTo(sx, sy + size * 0.15);
+                ctx.lineTo(sx - size * 0.15, sy + size * 0.35);
+                ctx.lineTo(sx + size * 0.15, sy + size * 0.35);
+                ctx.closePath();
+                ctx.fill();
+
+                // Whiskers
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                for (let i = -1; i <= 1; i += 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(sx + i * size * 0.2, sy + size * 0.3);
+                    ctx.lineTo(sx + i * size * 0.8, sy + size * 0.2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(sx + i * size * 0.2, sy + size * 0.35);
+                    ctx.lineTo(sx + i * size * 0.8, sy + size * 0.4);
+                    ctx.stroke();
+                }
+            } else {
+                // Human nose/face
+                ctx.fillStyle = '#d4a574';
+                ctx.beginPath();
+                ctx.ellipse(sx, sy + size * 0.2, size * 0.15, size * 0.2, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Beard
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(sx, sy + size * 0.6, size * 0.5, 0, Math.PI);
+                ctx.fill();
+            }
+
+            // Mouth
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, sy + size * 0.45, size * 0.2, 0.2, Math.PI - 0.2);
+            ctx.stroke();
+        }
+
+        function drawMinimap() {
+            minimapCtx.fillStyle = '#0066AA';
+            minimapCtx.fillRect(0, 0, 120, 120);
+
+            const scale = 120 / WORLD_WIDTH;
+
+            // Islands
+            islands.forEach(island => {
+                minimapCtx.fillStyle = '#f4d03f';
+                minimapCtx.beginPath();
+                minimapCtx.arc(island.x * scale, island.y * scale, island.radius * scale, 0, Math.PI * 2);
+                minimapCtx.fill();
+            });
+
+            // Treasures
+            treasures.forEach(treasure => {
+                minimapCtx.fillStyle = treasure.type === 'legendary' ? '#ff00ff' : '#ffd700';
+                minimapCtx.fillRect(treasure.x * scale - 2, treasure.y * scale - 2, 4, 4);
+            });
+
+            // Enemies
+            enemies.forEach(enemy => {
+                minimapCtx.fillStyle = enemy.type === 'cat' ? '#ff6666' : '#ff0000';
+                minimapCtx.fillRect(enemy.x * scale - 2, enemy.y * scale - 2, 4, 4);
+            });
+
+            // Player
+            minimapCtx.fillStyle = '#00ff00';
+            minimapCtx.beginPath();
+            minimapCtx.arc(player.x * scale, player.y * scale, 4, 0, Math.PI * 2);
+            minimapCtx.fill();
+
+            // View box
+            minimapCtx.strokeStyle = '#fff';
+            minimapCtx.lineWidth = 1;
+            minimapCtx.strokeRect(
+                camera.x * scale,
+                camera.y * scale,
+                canvas.width * scale,
+                canvas.height * scale
+            );
+        }
+
+        function updateUI() {
+            document.getElementById('gold').textContent = player.gold;
+            document.getElementById('health').textContent = Math.ceil(player.health);
+            document.getElementById('shipName').textContent = player.ship.name;
+            document.getElementById('crewCount').textContent = player.crew.length;
+
+            const crewDisplay = document.getElementById('crewDisplay');
+            crewDisplay.innerHTML = player.crew.map(c => {
+                const icon = c.type === 'captain' ? '👑' : c.type === 'gunner' ? '💣' : c.type === 'medic' ? '❤️' : '⚓';
+                return `<span class="crew-cat" title="${c.name} (${c.type})">${icon}</span>`;
+            }).join('');
+        }
+
+        function updateQuest() {
+            document.getElementById('questText').textContent =
+                `Find ${LEGENDARY_TREASURES_NEEDED} legendary treasures to become the Pirate King!`;
+            document.getElementById('questProgress').textContent =
+                `Progress: ${legendaryTreasuresFound}/${LEGENDARY_TREASURES_NEEDED} 👑`;
+        }
+
+        function showNotification(text) {
+            const notif = document.getElementById('notification');
+            notif.textContent = text;
+            notif.classList.remove('hidden');
+            setTimeout(() => notif.classList.add('hidden'), 3000);
+        }
+
+        function openShop() {
+            if (!gameRunning) return;
+
+            // Check if near a shop island
+            let nearShop = false;
+            for (const island of islands) {
+                if (island.hasShop && Math.hypot(player.x - island.x, player.y - island.y) < island.radius + 100) {
+                    nearShop = true;
+                    break;
+                }
+            }
+
+            if (!nearShop) {
+                showNotification('Sail to an island with a 🏪 to shop!');
+                return;
+            }
+
+            gameRunning = false;
+            document.getElementById('shopScreen').classList.remove('hidden');
+
+            const shopItems = document.getElementById('shopItems');
+            shopItems.innerHTML = '';
+
+            // Ship upgrades
+            Object.entries(SHIPS).forEach(([key, ship]) => {
+                if (key === player.shipType) return;
+                const canAfford = player.gold >= ship.cost;
+                const owned = false;
+
+                const item = document.createElement('div');
+                item.className = 'shop-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>${ship.name}</strong><br>
+                        <small>❤️${ship.health} ⚔️${ship.cannons} 💨${ship.speed}</small>
+                    </div>
+                    <button class="shop-btn" ${!canAfford ? 'disabled' : ''} onclick="buyShip('${key}')">
+                        ${ship.cost} 💰
+                    </button>
+                `;
+                shopItems.appendChild(item);
+            });
+
+            // Crew hiring
+            const crewTypes = [
+                { type: 'sailor', name: 'Sailor', desc: 'Reduces damage taken', cost: 200 },
+                { type: 'gunner', name: 'Gunner', desc: '+1 cannon, +5 damage', cost: 300 },
+                { type: 'medic', name: 'Medic', desc: 'Slowly heals ship', cost: 400 }
+            ];
+
+            crewTypes.forEach(crew => {
+                const canAfford = player.gold >= crew.cost && player.crew.length < 10;
+                const item = document.createElement('div');
+                item.className = 'shop-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>Hire ${crew.name} 🐱</strong><br>
+                        <small>${crew.desc}</small>
+                    </div>
+                    <button class="shop-btn" ${!canAfford ? 'disabled' : ''} onclick="hireCrew('${crew.type}', ${crew.cost})">
+                        ${crew.cost} 💰
+                    </button>
+                `;
+                shopItems.appendChild(item);
+            });
+
+            // Repair ship
+            if (player.health < player.maxHealth) {
+                const repairCost = Math.ceil((player.maxHealth - player.health) * 0.5);
+                const item = document.createElement('div');
+                item.className = 'shop-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>Repair Ship 🔧</strong><br>
+                        <small>Restore full health</small>
+                    </div>
+                    <button class="shop-btn" ${player.gold < repairCost ? 'disabled' : ''} onclick="repairShip(${repairCost})">
+                        ${repairCost} 💰
+                    </button>
+                `;
+                shopItems.appendChild(item);
+            }
+        }
+
+        function buyShip(shipType) {
+            const ship = SHIPS[shipType];
+            if (player.gold >= ship.cost) {
+                player.gold -= ship.cost;
+                player.ship = {...ship};
+                player.shipType = shipType;
+                player.health = ship.health;
+                player.maxHealth = ship.health;
+                showNotification(`Purchased ${ship.name}!`);
+                closeShop();
+            }
+        }
+
+        function hireCrew(type, cost) {
+            if (player.gold >= cost && player.crew.length < 10) {
+                player.gold -= cost;
+                player.crew.push({
+                    name: CAT_NAMES[Math.floor(Math.random() * CAT_NAMES.length)],
+                    type: type
+                });
+                showNotification(`Hired a new ${type}!`);
+                updateUI();
+                openShop(); // Refresh shop
+            }
+        }
+
+        function repairShip(cost) {
+            if (player.gold >= cost) {
+                player.gold -= cost;
+                player.health = player.maxHealth;
+                showNotification('Ship fully repaired!');
+                closeShop();
+            }
+        }
+
+        function closeShop() {
+            document.getElementById('shopScreen').classList.add('hidden');
+            gameRunning = true;
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalGold').textContent = player.gold;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function victory() {
+            gameRunning = false;
+            document.getElementById('victoryGold').textContent = player.gold;
+            document.getElementById('victoryScreen').classList.remove('hidden');
+        }
+
+        // Make shop functions global
+        window.buyShip = buyShip;
+        window.hireCrew = hireCrew;
+        window.repairShip = repairShip;
+
+        // Start when DOM ready
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
