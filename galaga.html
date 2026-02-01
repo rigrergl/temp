@@ -963,16 +963,21 @@
                         if (frameCount % 4 === 0 && e.alive) hitEnemy(e);
                     }
                 }
-                // Absorb enemy bullets in wider range
+                // Absorb enemy bullets - massive range when gravity power active
+                let bulletPullRange = currentPowerUp === 'gravity' ? bh.maxRadius * 8 : bh.radius * 2;
+                let bulletPullStrength = currentPowerUp === 'gravity' ? 5 : 2;
+                let bulletDestroyRadius = currentPowerUp === 'gravity' ? bh.radius * 0.8 : bh.radius * 0.5;
                 for (let j = enemyBullets.length - 1; j >= 0; j--) {
                     let eb = enemyBullets[j];
                     let ebDist = Math.hypot(eb.x - bh.x, eb.y - bh.y);
-                    if (ebDist < bh.radius * 2) {
-                        // Pull bullets toward center too
+                    if (ebDist < bulletPullRange) {
                         let dx = bh.x - eb.x, dy = bh.y - eb.y;
-                        eb.vx = (eb.vx || 0) + (dx / ebDist) * 2;
-                        eb.vy += (dy / ebDist) * 2;
-                        if (ebDist < bh.radius * 0.5) {
+                        let pull = currentPowerUp === 'gravity' ? bulletPullStrength * (1 + (bulletPullRange - ebDist) / bulletPullRange) : bulletPullStrength;
+                        eb.vx = (eb.vx || 0) + (dx / ebDist) * pull;
+                        eb.vy += (dy / ebDist) * pull;
+                        // Disable homing so absorbed missiles don't fight the pull
+                        if (currentPowerUp === 'gravity') eb.homing = false;
+                        if (ebDist < bulletDestroyRadius) {
                             enemyBullets.splice(j, 1);
                             spawnParticles(eb.x, eb.y, '#609', 3, 2);
                         }
@@ -1046,8 +1051,19 @@
         if (currentPowerUp === 'gravity') {
             gravityFlipped = true;
             for (let eb of enemyBullets) {
-                eb.vy *= 0.95; // slow them down
-                eb.vy -= 0.15 * scale; // push them back up
+                // If there are black holes, they handle the pulling
+                // Otherwise, strongly repel bullets away from player
+                if (blackHoles.length === 0) {
+                    let dx = eb.x - player.x, dy = eb.y - player.y;
+                    let dist = Math.hypot(dx, dy);
+                    if (dist > 0 && dist < 200 * scale) {
+                        let repel = 3 * scale * (200 * scale - dist) / (200 * scale);
+                        eb.vx = (eb.vx || 0) + (dx / dist) * repel;
+                        eb.vy += (dy / dist) * repel;
+                    }
+                }
+                eb.vy *= 0.92; // slow them down more
+                eb.vy -= 0.3 * scale; // push them back up harder
             }
         } else {
             gravityFlipped = false;
