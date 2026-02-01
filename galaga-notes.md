@@ -1,5 +1,9 @@
 # Galaga Game - Development Notes & Lessons Learned
 
+**[Play Galaga](https://htmlpreview.github.io/?https://github.com/rigrergl/temp/blob/main/galaga.html)**
+
+![Galaga Gameplay](galaga-screenshot.png)
+
 ## Mobile Safari Essentials
 
 ### Viewport Setup
@@ -85,11 +89,6 @@ Everything in one HTML file:
 2. HTML structure: canvas, HUD, touch zone, start/game-over screens
 3. Single `<script>` IIFE containing all game logic
 4. No external dependencies
-
-## Playable Link
-To play an HTML file from a GitHub repo on mobile, use `raw.githack.com` — regular GitHub file links just show source code, but this CDN serves the file with proper content-type headers so the browser renders it.
-
-**[Play Galaga](https://raw.githack.com/rigrergl/temp/main/galaga.html)**
 
 ## Fire Rate
 - 120ms between shots feels right for Galaga-speed action
