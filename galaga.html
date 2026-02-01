@@ -263,8 +263,8 @@
     function resize() {
         W = canvas.width = window.innerWidth;
         H = canvas.height = getViewportHeight();
-        canvas.style.width = W + 'px';
-        canvas.style.height = H + 'px';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
         scale = Math.min(W / 390, H / 844);
         player.w = 32 * scale;
         player.h = 32 * scale;
