@@ -2,7 +2,7 @@
 
 **[Play Galaga](https://htmlpreview.github.io/?https://github.com/rigrergl/temp/blob/main/galaga.html)**
 
-![Galaga Gameplay](galaga-screenshot.png)
+![Galaga Gameplay](IMG_9744.jpeg)
 
 ## Mobile Safari Essentials
 
