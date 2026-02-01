@@ -224,6 +224,11 @@
     const POWERUP_DURATION = 300; // ~5 seconds at 60fps
     let shieldHP = 0;
     let screenShake = 0;
+    let blackHoles = [];
+    let boomerangs = [];
+    let lightningBolts = [];
+    let gravityFlipped = false;
+    let minigunAngle = 0;
     let comboCount = 0;
     let comboTimer = 0;
     let floatingTexts = [];
@@ -236,6 +241,12 @@
         { id: 'shield', label: 'SHIELD',      color: '#0f0', icon: 'S' },
         { id: 'timewarp', label: 'TIME WARP', color: '#a0f', icon: 'T' },
         { id: 'pierce', label: 'PIERCING SHOT', color: '#ff4', icon: 'P' },
+        { id: 'blackhole', label: 'BLACK HOLE', color: '#609', icon: 'O' },
+        { id: 'boomerang', label: 'BOOMERANG', color: '#f55', icon: 'B' },
+        { id: 'drunk', label: 'DRUNK MISSILES', color: '#5f5', icon: 'D' },
+        { id: 'lightning', label: 'CHAIN LIGHTNING', color: '#aef', icon: 'Z' },
+        { id: 'gravity', label: 'GRAVITY FLIP', color: '#fa0', icon: 'G' },
+        { id: 'minigun', label: 'MINIGUN', color: '#ccc', icon: 'R' },
     ];
 
     function resize() {
@@ -612,8 +623,8 @@
     }
 
     function dropPowerUp(x, y) {
-        // 12% chance to drop a power-up
-        if (Math.random() > 0.12) return;
+        // 4% chance to drop a power-up
+        if (Math.random() > 0.04) return;
         let type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
         powerUps.push({
             x, y,
@@ -756,9 +767,13 @@
         // --- PLAYER BULLETS ---
         for (let i = bullets.length - 1; i >= 0; i--) {
             let b = bullets[i];
+            if (b.drunk) {
+                b.drunkPhase += 0.15;
+                b.vx = Math.sin(b.drunkPhase) * 4 * scale;
+            }
             b.x += (b.vx || 0);
             b.y += (b.vy || -7 * scale);
-            if (b.y < -10 || b.x < -10 || b.x > W + 10) { bullets.splice(i, 1); continue; }
+            if (b.y < -10 || b.y > H + 10 || b.x < -10 || b.x > W + 10) { bullets.splice(i, 1); continue; }
 
             let removed = false;
             for (let e of enemies) {
@@ -846,6 +861,91 @@
                     break;
                 }
             }
+        }
+
+        // --- BLACK HOLES ---
+        for (let i = blackHoles.length - 1; i >= 0; i--) {
+            let bh = blackHoles[i];
+            if (!bh.deployed) {
+                bh.y += bh.vy;
+                if (bh.y < H * 0.35) { bh.deployed = true; bh.vy = 0; }
+            }
+            if (bh.deployed) {
+                bh.radius = Math.min(bh.radius + 1.5 * scale, bh.maxRadius);
+                // Pull enemies toward center
+                for (let e of enemies) {
+                    if (!e.alive) continue;
+                    let dx = bh.x - e.x, dy = bh.y - e.y;
+                    let dist = Math.hypot(dx, dy);
+                    if (dist < bh.radius * 2.5 && dist > 0) {
+                        let pull = (bh.radius * 2.5 - dist) / (bh.radius * 2.5) * 2 * scale;
+                        e.x += (dx / dist) * pull;
+                        e.y += (dy / dist) * pull;
+                    }
+                    if (dist < 10 * scale) {
+                        hitEnemy(e);
+                    }
+                }
+                // Absorb enemy bullets
+                for (let j = enemyBullets.length - 1; j >= 0; j--) {
+                    let eb = enemyBullets[j];
+                    if (Math.hypot(eb.x - bh.x, eb.y - bh.y) < bh.radius) {
+                        enemyBullets.splice(j, 1);
+                    }
+                }
+            }
+            bh.life--;
+            if (bh.life <= 0) {
+                spawnExplosion(bh.x, bh.y, '#609', 2);
+                screenShake = 6;
+                // Damage nearby enemies on collapse
+                for (let e of enemies) {
+                    if (!e.alive) continue;
+                    if (Math.hypot(e.x - bh.x, e.y - bh.y) < bh.maxRadius * 1.5) {
+                        hitEnemy(e);
+                    }
+                }
+                blackHoles.splice(i, 1);
+            }
+        }
+
+        // --- BOOMERANGS ---
+        for (let i = boomerangs.length - 1; i >= 0; i--) {
+            let bm = boomerangs[i];
+            bm.t += 0.02;
+            // Elliptical path
+            let range = 180 * scale;
+            bm.x = bm.startX + Math.sin(bm.t * Math.PI) * range * bm.dir;
+            bm.y = bm.startY - Math.sin(bm.t * Math.PI) * range * 1.2;
+            // Hit enemies
+            for (let e of enemies) {
+                if (!e.alive || bm.hit.has(e)) continue;
+                if (Math.abs(bm.x - e.x) < e.w * 0.6 + 10 * scale && Math.abs(bm.y - e.y) < e.h * 0.6 + 10 * scale) {
+                    bm.hit.add(e);
+                    hitEnemy(e);
+                    spawnParticles(e.x, e.y, '#f55', 6, 3);
+                }
+            }
+            if (bm.t >= 1) {
+                boomerangs.splice(i, 1);
+            }
+        }
+
+        // --- LIGHTNING BOLTS (visual only) ---
+        for (let i = lightningBolts.length - 1; i >= 0; i--) {
+            lightningBolts[i].life--;
+            if (lightningBolts[i].life <= 0) lightningBolts.splice(i, 1);
+        }
+
+        // --- GRAVITY EFFECT on enemy bullets ---
+        if (currentPowerUp === 'gravity') {
+            gravityFlipped = true;
+            for (let eb of enemyBullets) {
+                eb.vy *= 0.95; // slow them down
+                eb.vy -= 0.15 * scale; // push them back up
+            }
+        } else {
+            gravityFlipped = false;
         }
 
         // --- POWER-UPS ---
@@ -991,7 +1091,8 @@
     // --- FIRE LOGIC ---
     function fire() {
         let now = Date.now();
-        if (now - lastFireTime < FIRE_RATE) return;
+        let rate = (currentPowerUp === 'minigun') ? FIRE_RATE * 0.25 : FIRE_RATE;
+        if (now - lastFireTime < rate) return;
         lastFireTime = now;
 
         if (currentPowerUp === 'spread') {
@@ -1044,6 +1145,108 @@
                 x: player.x + 5 * scale,
                 y: player.y - player.h * 0.5,
                 vy: -8 * scale
+            });
+        } else if (currentPowerUp === 'blackhole') {
+            // Launch a black hole projectile that sucks enemies in
+            blackHoles.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vy: -4 * scale,
+                life: 180,
+                radius: 0,
+                maxRadius: 60 * scale,
+                deployed: false
+            });
+        } else if (currentPowerUp === 'boomerang') {
+            // Fire a boomerang that curves out and comes back
+            boomerangs.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                startX: player.x,
+                startY: player.y,
+                t: 0,
+                dir: (Math.random() < 0.5) ? -1 : 1,
+                hit: new Set()
+            });
+        } else if (currentPowerUp === 'drunk') {
+            // Fire wobbly zigzag bullets
+            for (let i = 0; i < 3; i++) {
+                bullets.push({
+                    x: player.x + (i - 1) * 10 * scale,
+                    y: player.y - player.h * 0.5,
+                    vy: -7 * scale,
+                    vx: 0,
+                    drunk: true,
+                    drunkPhase: Math.random() * Math.PI * 2,
+                    pierce: true
+                });
+            }
+        } else if (currentPowerUp === 'lightning') {
+            // Zap a chain of enemies
+            let targets = [];
+            let remaining = enemies.filter(e => e.alive);
+            if (remaining.length > 0) {
+                let current = remaining.reduce((closest, e) => {
+                    let d = Math.hypot(e.x - player.x, e.y - player.y);
+                    let dc = Math.hypot(closest.x - player.x, closest.y - player.y);
+                    return d < dc ? e : closest;
+                }, remaining[0]);
+                let used = new Set();
+                for (let chain = 0; chain < 5 && current; chain++) {
+                    targets.push({ x: current.x, y: current.y });
+                    current.hp -= 1;
+                    if (current.hp <= 0) {
+                        current.alive = false;
+                        score += ENEMY_TYPES[current.type].score;
+                        spawnExplosion(current.x, current.y, ENEMY_TYPES[current.type].color, 1);
+                        dropPowerUp(current.x, current.y);
+                    }
+                    used.add(current);
+                    let next = null, bestDist = Infinity;
+                    for (let e of remaining) {
+                        if (!e.alive || used.has(e)) continue;
+                        let d = Math.hypot(e.x - current.x, e.y - current.y);
+                        if (d < bestDist && d < 150 * scale) { bestDist = d; next = e; }
+                    }
+                    current = next;
+                }
+                if (targets.length > 0) {
+                    lightningBolts.push({
+                        points: [{ x: player.x, y: player.y - player.h * 0.5 }, ...targets],
+                        life: 12
+                    });
+                    screenShake = 4;
+                }
+            }
+        } else if (currentPowerUp === 'gravity') {
+            // Shoot upward and downward simultaneously
+            bullets.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vy: -9 * scale
+            });
+            bullets.push({
+                x: player.x - 12 * scale,
+                y: player.y - player.h * 0.5,
+                vx: -3 * scale,
+                vy: -7 * scale
+            });
+            bullets.push({
+                x: player.x + 12 * scale,
+                y: player.y - player.h * 0.5,
+                vx: 3 * scale,
+                vy: -7 * scale
+            });
+            // Gravity pulls enemy bullets down faster (handled in update)
+        } else if (currentPowerUp === 'minigun') {
+            // Rapid inaccurate spray
+            minigunAngle += 0.15;
+            let spread = Math.sin(minigunAngle) * 0.3;
+            bullets.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vx: Math.sin(spread) * 10 * scale,
+                vy: -Math.cos(spread) * 10 * scale
             });
         } else {
             // Normal double shot
@@ -1123,7 +1326,20 @@
 
         // Player bullets
         for (let b of bullets) {
-            if (b.pierce) {
+            if (b.drunk) {
+                // Drunk wobbly green bullets
+                ctx.shadowColor = '#5f5';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = '#5f5';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 1.5 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            } else if (b.pierce) {
                 // Piercing shot - bright wide bolt
                 ctx.shadowColor = '#ff4';
                 ctx.shadowBlur = 14;
@@ -1176,6 +1392,95 @@
             ctx.arc(0, -6 * scale, 1.5 * scale, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
+        }
+
+        // Black holes
+        for (let bh of blackHoles) {
+            ctx.save();
+            let alpha = Math.min(bh.life / 30, 1);
+            // Swirling accretion disk
+            for (let ring = 3; ring >= 0; ring--) {
+                let r = bh.radius * (0.5 + ring * 0.4);
+                ctx.beginPath();
+                ctx.arc(bh.x, bh.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${80 + ring * 30},0,${120 + ring * 30},${alpha * 0.15})`;
+                ctx.fill();
+            }
+            // Spinning lines
+            for (let s = 0; s < 6; s++) {
+                let a = frameCount * 0.05 + s * Math.PI / 3;
+                ctx.beginPath();
+                ctx.moveTo(bh.x, bh.y);
+                ctx.lineTo(bh.x + Math.cos(a) * bh.radius, bh.y + Math.sin(a) * bh.radius);
+                ctx.strokeStyle = `rgba(160,0,255,${alpha * 0.5})`;
+                ctx.lineWidth = 2 * scale;
+                ctx.stroke();
+            }
+            // Core
+            ctx.beginPath();
+            ctx.arc(bh.x, bh.y, 6 * scale, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(bh.x, bh.y, 8 * scale, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(160,0,255,${alpha * 0.8})`;
+            ctx.lineWidth = 2 * scale;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Boomerangs
+        for (let bm of boomerangs) {
+            ctx.save();
+            ctx.translate(bm.x, bm.y);
+            ctx.rotate(bm.t * Math.PI * 6); // spinning
+            ctx.fillStyle = '#f55';
+            ctx.beginPath();
+            ctx.moveTo(0, -10 * scale);
+            ctx.quadraticCurveTo(12 * scale, 0, 0, 4 * scale);
+            ctx.quadraticCurveTo(-12 * scale, 0, 0, -10 * scale);
+            ctx.fill();
+            ctx.fillStyle = '#faa';
+            ctx.beginPath();
+            ctx.arc(0, -3 * scale, 2 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Lightning bolts
+        for (let lb of lightningBolts) {
+            let alpha = lb.life / 12;
+            ctx.save();
+            ctx.strokeStyle = `rgba(170,238,255,${alpha})`;
+            ctx.lineWidth = 3 * scale;
+            ctx.shadowColor = '#aef';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            for (let p = 0; p < lb.points.length; p++) {
+                let pt = lb.points[p];
+                if (p === 0) ctx.moveTo(pt.x, pt.y);
+                else {
+                    // Jagged lightning segments
+                    let prev = lb.points[p - 1];
+                    let mx = (prev.x + pt.x) / 2 + (Math.random() - 0.5) * 20 * scale;
+                    let my = (prev.y + pt.y) / 2 + (Math.random() - 0.5) * 20 * scale;
+                    ctx.lineTo(mx, my);
+                    ctx.lineTo(pt.x, pt.y);
+                }
+            }
+            ctx.stroke();
+            // Bright core
+            ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.8})`;
+            ctx.lineWidth = 1.5 * scale;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+
+        // Gravity flip overlay
+        if (currentPowerUp === 'gravity') {
+            ctx.fillStyle = `rgba(255,160,0,${0.04 + Math.sin(frameCount * 0.08) * 0.02})`;
+            ctx.fillRect(-5, -5, W + 10, H + 10);
         }
 
         // Enemies
@@ -1328,6 +1633,11 @@
         powerUps = [];
         lasers = [];
         missiles = [];
+        blackHoles = [];
+        boomerangs = [];
+        lightningBolts = [];
+        gravityFlipped = false;
+        minigunAngle = 0;
         floatingTexts = [];
         formationX = 0;
         frameCount = 0;
