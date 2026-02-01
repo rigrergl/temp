@@ -127,7 +127,16 @@
             text-shadow: 0 0 6px rgba(255,255,255,0.5);
         }
 
-        #lives { color: #0f0; }
+        #lives {
+            color: #f44;
+            text-shadow: 0 0 8px rgba(255,50,50,0.7);
+            transition: transform 0.15s ease-out, text-shadow 0.15s ease-out;
+            display: inline-block;
+        }
+        #lives.hit {
+            transform: scale(1.8);
+            text-shadow: 0 0 16px rgba(255,0,0,1), 0 0 30px rgba(255,0,0,0.6);
+        }
 
         #powerUpHud {
             position: absolute;
@@ -224,6 +233,8 @@
     const POWERUP_DURATION = 300; // ~5 seconds at 60fps
     let shieldHP = 0;
     let screenShake = 0;
+    let invincibleTimer = 0;
+    let damageFlash = 0;
     let blackHoles = [];
     let boomerangs = [];
     let lightningBolts = [];
@@ -647,6 +658,8 @@
         // Screen shake decay
         if (screenShake > 0) screenShake *= 0.85;
         if (screenShake < 0.3) screenShake = 0;
+        if (invincibleTimer > 0) invincibleTimer--;
+        if (damageFlash > 0) damageFlash--;
 
         // Combo timer
         if (comboTimer > 0) {
@@ -1062,6 +1075,7 @@
     }
 
     function playerHit() {
+        if (invincibleTimer > 0) return;
         if (currentPowerUp === 'shield' && shieldHP > 0) {
             shieldHP--;
             screenShake = 5;
@@ -1073,19 +1087,25 @@
             return;
         }
         lives--;
-        spawnExplosion(player.x, player.y, '#4cf', 1.5);
-        screenShake = 8;
-        updateLivesHud();
+        spawnExplosion(player.x, player.y, '#f44', 1.5);
+        screenShake = 12;
+        updateLivesHud(true);
+        damageFlash = 8;
         if (lives <= 0) {
             gameOver();
         } else {
             player.x = W / 2;
-            // Brief invincibility flash handled visually
+            invincibleTimer = 90; // ~1.5 seconds of invincibility
         }
     }
 
-    function updateLivesHud() {
-        document.getElementById('lives').textContent = '♥'.repeat(Math.max(0, lives));
+    function updateLivesHud(wasHit) {
+        const el = document.getElementById('lives');
+        el.textContent = '♥'.repeat(Math.max(0, lives));
+        if (wasHit) {
+            el.classList.add('hit');
+            setTimeout(() => el.classList.remove('hit'), 300);
+        }
     }
 
     // --- FIRE LOGIC ---
@@ -1321,7 +1341,11 @@
 
         // Player
         if (gameRunning && lives > 0) {
+            if (invincibleTimer > 0) {
+                ctx.globalAlpha = (Math.floor(invincibleTimer / 4) % 2) ? 1.0 : 0.25;
+            }
             drawShip(player.x, player.y, player.w, player.h);
+            ctx.globalAlpha = 1;
         }
 
         // Player bullets
@@ -1598,6 +1622,12 @@
         }
         ctx.globalAlpha = 1;
 
+        // Damage flash overlay
+        if (damageFlash > 0) {
+            ctx.fillStyle = `rgba(255,0,0,${damageFlash / 16})`;
+            ctx.fillRect(0, 0, W, H);
+        }
+
         // Drag zone hint line
         if (gameRunning) {
             ctx.strokeStyle = 'rgba(255,255,255,0.04)';
@@ -1647,6 +1677,8 @@
         comboCount = 0;
         comboTimer = 0;
         screenShake = 0;
+        invincibleTimer = 0;
+        damageFlash = 0;
         player.x = W / 2;
         player.y = H - 100 * scale;
         powerUpHud.style.opacity = '0';
