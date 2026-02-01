@@ -221,7 +221,7 @@
     // Power-up state
     let currentPowerUp = null; // 'spread', 'laser', 'missile', 'shield'
     let powerUpTimer = 0;
-    const POWERUP_DURATION = 300; // ~5 seconds at 60fps
+    const POWERUP_DURATION = 180; // ~3 seconds at 60fps
     let shieldHP = 0;
     let screenShake = 0;
     let comboCount = 0;
@@ -612,8 +612,8 @@
     }
 
     function dropPowerUp(x, y) {
-        // 12% chance to drop a power-up
-        if (Math.random() > 0.12) return;
+        // 5% chance to drop a power-up
+        if (Math.random() > 0.05) return;
         let type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
         powerUps.push({
             x, y,
