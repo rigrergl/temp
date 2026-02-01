@@ -87,11 +87,9 @@ Everything in one HTML file:
 4. No external dependencies
 
 ## Playable Link
-To play an HTML file from a GitHub repo on mobile, use:
-```
-https://raw.githack.com/USERNAME/REPO/BRANCH/filename.html
-```
-Regular GitHub file links just show source code. The `raw.githack.com` CDN serves the file with proper content-type headers so the browser renders it.
+To play an HTML file from a GitHub repo on mobile, use `raw.githack.com` — regular GitHub file links just show source code, but this CDN serves the file with proper content-type headers so the browser renders it.
+
+**[Play Galaga](https://raw.githack.com/rigrergl/temp/main/galaga.html)**
 
 ## Fire Rate
 - 120ms between shots feels right for Galaga-speed action
