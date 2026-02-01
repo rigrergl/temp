@@ -129,6 +129,8 @@
 
         #lives {
             color: #f44;
+            font-size: clamp(32px, 10vw, 56px) !important;
+            line-height: 1;
             text-shadow: 0 0 8px rgba(255,50,50,0.7);
             transition: transform 0.15s ease-out, text-shadow 0.15s ease-out;
             display: inline-block;
@@ -271,6 +273,7 @@
         { id: 'drones', label: 'DRONE SWARM', color: '#bf0', icon: 'N' },
         { id: 'vortex', label: 'VORTEX BEAM', color: '#f0a', icon: 'V' },
         { id: 'photon', label: 'PHOTON TORPEDO', color: '#fa5', icon: 'Q' },
+        { id: 'dualshot', label: 'DUAL SHOT', color: '#8cf', icon: 'II', common: true },
         { id: 'supernova', label: '⭐ SUPERNOVA ⭐', color: '#ff0', icon: '★', rare: true },
     ];
 
@@ -656,7 +659,13 @@
             type = POWERUP_TYPES.find(t => t.id === 'supernova');
         } else {
             let normalTypes = POWERUP_TYPES.filter(t => !t.rare);
-            type = normalTypes[Math.floor(Math.random() * normalTypes.length)];
+            // Common power-ups get extra weight (appear ~3x more often)
+            let weightedTypes = [];
+            normalTypes.forEach(t => {
+                let count = t.common ? 3 : 1;
+                for (let i = 0; i < count; i++) weightedTypes.push(t);
+            });
+            type = weightedTypes[Math.floor(Math.random() * weightedTypes.length)];
         }
         powerUps.push({
             x, y,
@@ -1640,8 +1649,8 @@
                     pierce: true
                 });
             }
-        } else {
-            // Normal double shot
+        } else if (currentPowerUp === 'dualshot') {
+            // Dual shot power-up
             bullets.push({
                 x: player.x - 5 * scale,
                 y: player.y - player.h * 0.5,
@@ -1649,6 +1658,13 @@
             });
             bullets.push({
                 x: player.x + 5 * scale,
+                y: player.y - player.h * 0.5,
+                vy: -8 * scale
+            });
+        } else {
+            // Normal single shot
+            bullets.push({
+                x: player.x,
                 y: player.y - player.h * 0.5,
                 vy: -8 * scale
             });
