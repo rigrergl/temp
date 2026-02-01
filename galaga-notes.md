@@ -1,6 +1,6 @@
 # Galaga Game - Development Notes & Lessons Learned
 
-**[Play Galaga](https://raw.githack.com/rigrergl/temp/claude/asteroids-game-mobile-kQF99/galaga.html)**
+**[Play Galaga](https://raw.githack.com/rigrergl/temp/galaga-main/galaga.html)**
 
 ![Galaga Gameplay](IMG_9744.jpeg)
 
