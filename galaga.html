@@ -243,6 +243,12 @@
     let comboCount = 0;
     let comboTimer = 0;
     let floatingTexts = [];
+    let plasmaWaves = [];
+    let meteors = [];
+    let orbitDrones = [];
+    let photonTorpedoes = [];
+    let supernovaActive = false;
+    let vortexBeams = [];
 
     // Power-up definitions
     const POWERUP_TYPES = [
@@ -258,6 +264,14 @@
         { id: 'lightning', label: 'CHAIN LIGHTNING', color: '#aef', icon: 'Z' },
         { id: 'gravity', label: 'GRAVITY FLIP', color: '#fa0', icon: 'G' },
         { id: 'minigun', label: 'MINIGUN', color: '#ccc', icon: 'R' },
+        { id: 'plasma', label: 'PLASMA WAVE', color: '#0ef', icon: 'X' },
+        { id: 'meteor', label: 'METEOR SHOWER', color: '#f60', icon: 'E' },
+        { id: 'freeze', label: 'FREEZE RAY', color: '#8ff', icon: 'F' },
+        { id: 'ricochet', label: 'RICOCHET', color: '#ef0', icon: 'K' },
+        { id: 'drones', label: 'DRONE SWARM', color: '#bf0', icon: 'N' },
+        { id: 'vortex', label: 'VORTEX BEAM', color: '#f0a', icon: 'V' },
+        { id: 'photon', label: 'PHOTON TORPEDO', color: '#fa5', icon: 'Q' },
+        { id: 'supernova', label: '⭐ SUPERNOVA ⭐', color: '#ff0', icon: '★', rare: true },
     ];
 
     function resize() {
@@ -636,7 +650,14 @@
     function dropPowerUp(x, y) {
         // 4% chance to drop a power-up
         if (Math.random() > 0.04) return;
-        let type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+        let type;
+        // Supernova is super rare: 1% of drops
+        if (Math.random() < 0.01) {
+            type = POWERUP_TYPES.find(t => t.id === 'supernova');
+        } else {
+            let normalTypes = POWERUP_TYPES.filter(t => !t.rare);
+            type = normalTypes[Math.floor(Math.random() * normalTypes.length)];
+        }
         powerUps.push({
             x, y,
             vy: 1.5 * scale,
@@ -671,6 +692,7 @@
         if (currentPowerUp && currentPowerUp !== 'shield') {
             powerUpTimer--;
             if (powerUpTimer <= 0) {
+                if (supernovaActive) supernovaActive = false;
                 currentPowerUp = null;
                 powerUpHud.style.opacity = '0';
             } else {
@@ -701,6 +723,24 @@
         for (let e of enemies) {
             if (!e.alive) continue;
             aliveCount++;
+
+            // Freeze countdown
+            if (e.frozen && e.frozen > 0) {
+                e.frozen--;
+                // Frozen enemies don't move or shoot
+                if (e.frozen > 0) {
+                    // Icy particle effect
+                    if (frameCount % 10 === 0) {
+                        particles.push({
+                            x: e.x + (Math.random() - 0.5) * e.w,
+                            y: e.y + (Math.random() - 0.5) * e.h,
+                            vx: (Math.random() - 0.5), vy: -Math.random(),
+                            life: 15, maxLife: 15, color: '#8ff', size: 2 * scale
+                        });
+                    }
+                    continue;
+                }
+            }
 
             if (e.state === 'formation') {
                 e.x = e.homeX + formationX;
@@ -786,7 +826,13 @@
             }
             b.x += (b.vx || 0);
             b.y += (b.vy || -7 * scale);
-            if (b.y < -10 || b.y > H + 10 || b.x < -10 || b.x > W + 10) { bullets.splice(i, 1); continue; }
+            // Ricochet: bounce off screen edges
+            if (b.ricochet && b.ricochet > 0) {
+                if (b.x < 0 || b.x > W) { b.vx = -(b.vx || 0); b.ricochet--; b.x = Math.max(0, Math.min(W, b.x)); }
+                if (b.y < 0) { b.vy = -b.vy; b.ricochet--; b.y = Math.max(0, b.y); }
+            }
+            if (!b.ricochet && (b.y < -10 || b.y > H + 10 || b.x < -10 || b.x > W + 10)) { bullets.splice(i, 1); continue; }
+            if (b.ricochet && b.ricochet <= 0 && (b.y < -10 || b.y > H + 10)) { bullets.splice(i, 1); continue; }
 
             let removed = false;
             for (let e of enemies) {
@@ -800,6 +846,11 @@
                     if (!b.pierce) {
                         bullets.splice(i, 1);
                         removed = true;
+                    }
+                    // Freeze bullets freeze enemies
+                    if (b.freeze && e.alive) {
+                        e.frozen = 180; // 3 seconds frozen
+                        spawnParticles(e.x, e.y, '#8ff', 8, 3);
                     }
                     hitEnemy(e);
                     break;
@@ -876,7 +927,7 @@
             }
         }
 
-        // --- BLACK HOLES ---
+        // --- BLACK HOLES (MASSIVELY BUFFED) ---
         for (let i = blackHoles.length - 1; i >= 0; i--) {
             let bh = blackHoles[i];
             if (!bh.deployed) {
@@ -884,38 +935,70 @@
                 if (bh.y < H * 0.35) { bh.deployed = true; bh.vy = 0; }
             }
             if (bh.deployed) {
-                bh.radius = Math.min(bh.radius + 1.5 * scale, bh.maxRadius);
-                // Pull enemies toward center
+                bh.radius = Math.min(bh.radius + 3 * scale, bh.maxRadius);
+                // Pull ALL enemies toward center with massive gravity
                 for (let e of enemies) {
                     if (!e.alive) continue;
                     let dx = bh.x - e.x, dy = bh.y - e.y;
                     let dist = Math.hypot(dx, dy);
-                    if (dist < bh.radius * 2.5 && dist > 0) {
-                        let pull = (bh.radius * 2.5 - dist) / (bh.radius * 2.5) * 2 * scale;
-                        e.x += (dx / dist) * pull;
-                        e.y += (dy / dist) * pull;
+                    let pullRange = bh.maxRadius * 4; // huge pull range
+                    if (dist < pullRange && dist > 0) {
+                        let ratio = (pullRange - dist) / pullRange;
+                        let strength = ratio * ratio * 8 * scale;
+                        e.x += (dx / dist) * strength;
+                        e.y += (dy / dist) * strength;
                     }
-                    if (dist < 10 * scale) {
+                    // Kill zone - anything near the core gets shredded
+                    if (dist < bh.radius * 0.6) {
                         hitEnemy(e);
+                        if (frameCount % 4 === 0 && e.alive) hitEnemy(e);
                     }
                 }
-                // Absorb enemy bullets
+                // Absorb enemy bullets in wider range
                 for (let j = enemyBullets.length - 1; j >= 0; j--) {
                     let eb = enemyBullets[j];
-                    if (Math.hypot(eb.x - bh.x, eb.y - bh.y) < bh.radius) {
-                        enemyBullets.splice(j, 1);
+                    let ebDist = Math.hypot(eb.x - bh.x, eb.y - bh.y);
+                    if (ebDist < bh.radius * 2) {
+                        // Pull bullets toward center too
+                        let dx = bh.x - eb.x, dy = bh.y - eb.y;
+                        eb.vx = (eb.vx || 0) + (dx / ebDist) * 2;
+                        eb.vy += (dy / ebDist) * 2;
+                        if (ebDist < bh.radius * 0.5) {
+                            enemyBullets.splice(j, 1);
+                            spawnParticles(eb.x, eb.y, '#609', 3, 2);
+                        }
                     }
+                }
+                // Ambient particles swirling in
+                if (frameCount % 4 === 0) {
+                    let angle = Math.random() * Math.PI * 2;
+                    let r = bh.radius * (1 + Math.random());
+                    particles.push({
+                        x: bh.x + Math.cos(angle) * r,
+                        y: bh.y + Math.sin(angle) * r,
+                        vx: -Math.cos(angle) * 3, vy: -Math.sin(angle) * 3,
+                        life: 20, maxLife: 20, color: '#a0f', size: 2 * scale
+                    });
                 }
             }
             bh.life--;
             if (bh.life <= 0) {
-                spawnExplosion(bh.x, bh.y, '#609', 2);
-                screenShake = 6;
-                // Damage nearby enemies on collapse
+                // Massive collapse explosion
+                spawnExplosion(bh.x, bh.y, '#609', 3);
+                spawnExplosion(bh.x, bh.y, '#a0f', 2.5);
+                screenShake = 12;
+                // Kill everything in large radius on collapse
                 for (let e of enemies) {
                     if (!e.alive) continue;
-                    if (Math.hypot(e.x - bh.x, e.y - bh.y) < bh.maxRadius * 1.5) {
+                    if (Math.hypot(e.x - bh.x, e.y - bh.y) < bh.maxRadius * 2.5) {
                         hitEnemy(e);
+                        if (e.alive) hitEnemy(e); // double damage on collapse
+                    }
+                }
+                // Clear all nearby enemy bullets on collapse
+                for (let j = enemyBullets.length - 1; j >= 0; j--) {
+                    if (Math.hypot(enemyBullets[j].x - bh.x, enemyBullets[j].y - bh.y) < bh.maxRadius * 2) {
+                        enemyBullets.splice(j, 1);
                     }
                 }
                 blackHoles.splice(i, 1);
@@ -1009,13 +1092,203 @@
             }
         }
 
+        // --- PLASMA WAVES ---
+        for (let i = plasmaWaves.length - 1; i >= 0; i--) {
+            let pw = plasmaWaves[i];
+            pw.radius += 4 * scale;
+            pw.life--;
+            // Damage enemies the wave passes through
+            for (let e of enemies) {
+                if (!e.alive || pw.hit.has(e)) continue;
+                let dist = Math.hypot(e.x - pw.x, e.y - pw.y);
+                if (Math.abs(dist - pw.radius) < 20 * scale) {
+                    pw.hit.add(e);
+                    hitEnemy(e);
+                }
+            }
+            // Destroy enemy bullets in the wave
+            for (let j = enemyBullets.length - 1; j >= 0; j--) {
+                let eb = enemyBullets[j];
+                let dist = Math.hypot(eb.x - pw.x, eb.y - pw.y);
+                if (Math.abs(dist - pw.radius) < 15 * scale) {
+                    enemyBullets.splice(j, 1);
+                }
+            }
+            if (pw.life <= 0) plasmaWaves.splice(i, 1);
+        }
+
+        // --- METEORS ---
+        for (let i = meteors.length - 1; i >= 0; i--) {
+            let m = meteors[i];
+            m.x += m.vx;
+            m.y += m.vy;
+            m.vy += 0.15 * scale; // gravity
+            m.rotation += 0.1;
+            // Hit enemies
+            for (let e of enemies) {
+                if (!e.alive) continue;
+                if (Math.hypot(e.x - m.x, e.y - m.y) < (e.w + m.size) * 0.5) {
+                    hitEnemy(e);
+                    if (e.alive) hitEnemy(e); // meteors hit hard
+                    spawnExplosion(m.x, m.y, '#f60', 1);
+                    m.life = 0;
+                    break;
+                }
+            }
+            m.life--;
+            if (m.life <= 0 || m.y > H + 20) {
+                if (m.life <= 0) {
+                    spawnExplosion(m.x, m.y, '#f60', 0.8);
+                    screenShake = 3;
+                }
+                meteors.splice(i, 1);
+            }
+            // Trail
+            if (frameCount % 2 === 0) {
+                particles.push({
+                    x: m.x, y: m.y,
+                    vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2,
+                    life: 15, maxLife: 15, color: '#f80', size: 3 * scale
+                });
+            }
+        }
+
+        // --- ORBIT DRONES ---
+        for (let i = orbitDrones.length - 1; i >= 0; i--) {
+            let d = orbitDrones[i];
+            d.angle += 0.06;
+            d.x = player.x + Math.cos(d.angle) * d.orbitRadius;
+            d.y = player.y + Math.sin(d.angle) * d.orbitRadius;
+            // Auto-fire at nearby enemies
+            if (frameCount % 12 === 0) {
+                let closest = null, bestDist = 200 * scale;
+                for (let e of enemies) {
+                    if (!e.alive) continue;
+                    let dist = Math.hypot(e.x - d.x, e.y - d.y);
+                    if (dist < bestDist) { bestDist = dist; closest = e; }
+                }
+                if (closest) {
+                    let angle = Math.atan2(closest.y - d.y, closest.x - d.x);
+                    bullets.push({
+                        x: d.x, y: d.y,
+                        vx: Math.cos(angle) * 6 * scale,
+                        vy: Math.sin(angle) * 6 * scale,
+                        drone: true
+                    });
+                }
+            }
+            d.life--;
+            if (d.life <= 0) orbitDrones.splice(i, 1);
+        }
+
+        // --- PHOTON TORPEDOES ---
+        for (let i = photonTorpedoes.length - 1; i >= 0; i--) {
+            let pt = photonTorpedoes[i];
+            pt.y += pt.vy;
+            pt.glow = Math.min(pt.glow + 0.5, 20);
+            // Trail
+            if (frameCount % 2 === 0) {
+                particles.push({
+                    x: pt.x + (Math.random() - 0.5) * 6, y: pt.y + 5 * scale,
+                    vx: (Math.random() - 0.5), vy: Math.random() * 2,
+                    life: 12, maxLife: 12, color: '#fa5', size: 3 * scale
+                });
+            }
+            // Hit enemy or reach top -> explode
+            let exploded = false;
+            for (let e of enemies) {
+                if (!e.alive) continue;
+                if (Math.hypot(e.x - pt.x, e.y - pt.y) < (e.w + 10) * 0.5) {
+                    exploded = true; break;
+                }
+            }
+            if (exploded || pt.y < -10) {
+                // AOE explosion
+                spawnExplosion(pt.x, pt.y, '#fa5', 2.5);
+                spawnExplosion(pt.x, pt.y, '#fff', 1.5);
+                screenShake = 8;
+                for (let e of enemies) {
+                    if (!e.alive) continue;
+                    if (Math.hypot(e.x - pt.x, e.y - pt.y) < 120 * scale) {
+                        hitEnemy(e);
+                        if (e.alive) hitEnemy(e);
+                    }
+                }
+                photonTorpedoes.splice(i, 1);
+            }
+        }
+
+        // --- VORTEX BEAMS ---
+        for (let i = vortexBeams.length - 1; i >= 0; i--) {
+            let vb = vortexBeams[i];
+            vb.angle += 0.08;
+            vb.length = Math.min(vb.length + 8 * scale, H * 0.8);
+            vb.life--;
+            // Damage enemies along the beam
+            let bx = player.x, by = player.y;
+            for (let e of enemies) {
+                if (!e.alive) continue;
+                // Check if enemy is near the spinning beam line
+                let beamEndX = bx + Math.cos(vb.angle) * vb.length;
+                let beamEndY = by + Math.sin(vb.angle) * vb.length;
+                let dx = beamEndX - bx, dy = beamEndY - by;
+                let t = Math.max(0, Math.min(1, ((e.x - bx) * dx + (e.y - by) * dy) / (dx * dx + dy * dy)));
+                let closestX = bx + t * dx, closestY = by + t * dy;
+                if (Math.hypot(e.x - closestX, e.y - closestY) < 25 * scale) {
+                    if (frameCount % 6 === 0) hitEnemy(e);
+                }
+            }
+            if (vb.life <= 0) vortexBeams.splice(i, 1);
+        }
+
+        // --- SUPERNOVA ---
+        if (supernovaActive) {
+            // Kill any enemy that touches the player
+            for (let e of enemies) {
+                if (!e.alive) continue;
+                if (Math.hypot(e.x - player.x, e.y - player.y) < 50 * scale) {
+                    e.hp = 0;
+                    hitEnemy(e);
+                    spawnExplosion(e.x, e.y, '#ff0', 1.5);
+                }
+            }
+            // Destroy nearby enemy bullets
+            for (let j = enemyBullets.length - 1; j >= 0; j--) {
+                let eb = enemyBullets[j];
+                if (Math.hypot(eb.x - player.x, eb.y - player.y) < 40 * scale) {
+                    enemyBullets.splice(j, 1);
+                    spawnParticles(eb.x, eb.y, '#ff0', 4, 2);
+                }
+            }
+            // Rainbow trail particles
+            if (frameCount % 4 === 0) {
+                let hue = (frameCount * 8) % 360;
+                particles.push({
+                    x: player.x + (Math.random() - 0.5) * 20,
+                    y: player.y + (Math.random() - 0.5) * 20,
+                    vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4,
+                    life: 20, maxLife: 20, color: `hsl(${hue},100%,60%)`, size: 4 * scale
+                });
+            }
+        }
+
+        // --- FREEZE effect ---
+        // (handled in enemy movement - enemies don't move when frozen)
+
         // Enemy-player collision
         for (let e of enemies) {
             if (!e.alive) continue;
             if (Math.abs(e.x - player.x) < (e.w + player.w) * 0.45 && Math.abs(e.y - player.y) < (e.h + player.h) * 0.45) {
-                e.alive = false;
-                spawnExplosion(e.x, e.y, ENEMY_TYPES[e.type].color, 1);
-                playerHit();
+                if (supernovaActive) {
+                    // Supernova destroys enemies on contact
+                    e.hp = 0;
+                    hitEnemy(e);
+                    spawnExplosion(e.x, e.y, '#ff0', 1.5);
+                } else {
+                    e.alive = false;
+                    spawnExplosion(e.x, e.y, ENEMY_TYPES[e.type].color, 1);
+                    playerHit();
+                }
             }
         }
 
@@ -1068,13 +1341,34 @@
         powerUpHud.textContent = label;
         powerUpHud.style.color = color;
         powerUpHud.style.opacity = '1';
+        supernovaActive = false; // reset
         if (type === 'shield') {
             shieldHP = 2;
+        } else if (type === 'drones') {
+            // Spawn 4 orbiting drones
+            orbitDrones = [];
+            for (let i = 0; i < 4; i++) {
+                orbitDrones.push({
+                    x: player.x, y: player.y,
+                    angle: (Math.PI * 2 / 4) * i,
+                    orbitRadius: 50 * scale,
+                    life: POWERUP_DURATION
+                });
+            }
+        } else if (type === 'supernova') {
+            supernovaActive = true;
+            powerUpTimer = 480; // 8 seconds of pure destruction
+            screenShake = 15;
+            // Big activation explosion
+            spawnExplosion(player.x, player.y, '#ff0', 3);
+            spawnExplosion(player.x, player.y, '#fff', 2);
+            spawnExplosion(player.x, player.y, '#f80', 2.5);
         }
         spawnFloatingText(player.x, player.y - 40, label + '!', color);
     }
 
     function playerHit() {
+        if (supernovaActive) return; // TOTALLY invincible during supernova
         if (invincibleTimer > 0) return;
         if (currentPowerUp === 'shield' && shieldHP > 0) {
             shieldHP--;
@@ -1171,10 +1465,10 @@
             blackHoles.push({
                 x: player.x,
                 y: player.y - player.h * 0.5,
-                vy: -4 * scale,
-                life: 180,
+                vy: -5 * scale,
+                life: 300,
                 radius: 0,
-                maxRadius: 60 * scale,
+                maxRadius: 100 * scale,
                 deployed: false
             });
         } else if (currentPowerUp === 'boomerang') {
@@ -1268,6 +1562,84 @@
                 vx: Math.sin(spread) * 10 * scale,
                 vy: -Math.cos(spread) * 10 * scale
             });
+        } else if (currentPowerUp === 'plasma') {
+            // Expanding plasma wave ring from player
+            plasmaWaves.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                radius: 5 * scale,
+                life: 60,
+                hit: new Set()
+            });
+        } else if (currentPowerUp === 'meteor') {
+            // Rain meteors from the top of the screen
+            for (let i = 0; i < 3; i++) {
+                meteors.push({
+                    x: player.x + (Math.random() - 0.5) * W * 0.6,
+                    y: -20,
+                    vx: (Math.random() - 0.5) * 3 * scale,
+                    vy: 4 * scale + Math.random() * 3 * scale,
+                    size: 12 * scale,
+                    rotation: Math.random() * Math.PI * 2,
+                    life: 120
+                });
+            }
+        } else if (currentPowerUp === 'freeze') {
+            // Freeze ray - shoot a beam that freezes enemies
+            bullets.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vy: -10 * scale,
+                freeze: true
+            });
+        } else if (currentPowerUp === 'ricochet') {
+            // Ricochet bullet that bounces off walls
+            bullets.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vx: (Math.random() - 0.5) * 4 * scale,
+                vy: -8 * scale,
+                ricochet: 5, // bounces remaining
+                pierce: true
+            });
+        } else if (currentPowerUp === 'drones') {
+            // Normal shot while drones auto-fire
+            bullets.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vy: -8 * scale
+            });
+        } else if (currentPowerUp === 'vortex') {
+            // Spinning beam of death
+            if (vortexBeams.length === 0) {
+                vortexBeams.push({
+                    angle: -Math.PI / 2,
+                    length: 20 * scale,
+                    life: 90
+                });
+            }
+        } else if (currentPowerUp === 'photon') {
+            // Slow, devastating photon torpedo
+            photonTorpedoes.push({
+                x: player.x,
+                y: player.y - player.h * 0.5,
+                vy: -3 * scale,
+                glow: 0
+            });
+        } else if (currentPowerUp === 'supernova') {
+            // During supernova, fire massive rainbow spread
+            for (let a = -2; a <= 2; a++) {
+                let angle = -Math.PI / 2 + a * 0.18;
+                let hue = (frameCount * 8 + a * 60) % 360;
+                bullets.push({
+                    x: player.x,
+                    y: player.y - player.h * 0.5,
+                    vx: Math.cos(angle) * 9 * scale,
+                    vy: Math.sin(angle) * 9 * scale,
+                    supernova: true,
+                    pierce: true
+                });
+            }
         } else {
             // Normal double shot
             bullets.push({
@@ -1350,7 +1722,36 @@
 
         // Player bullets
         for (let b of bullets) {
-            if (b.drunk) {
+            if (b.supernova) {
+                let hue = (frameCount * 10 + b.x * 0.5) % 360;
+                ctx.fillStyle = `hsl(${hue},100%,60%)`;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 5 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 2 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (b.freeze) {
+                ctx.fillStyle = '#8ff';
+                ctx.fillRect(b.x - 2 * scale, b.y - 8 * scale, 4 * scale, 16 * scale);
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(b.x - 1 * scale, b.y - 6 * scale, 2 * scale, 12 * scale);
+            } else if (b.ricochet) {
+                ctx.fillStyle = '#ef0';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4 * scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 2 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (b.drone) {
+                ctx.fillStyle = '#bf0';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 3 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (b.drunk) {
                 // Drunk wobbly green bullets
                 ctx.shadowColor = '#5f5';
                 ctx.shadowBlur = 10;
@@ -1505,6 +1906,134 @@
         if (currentPowerUp === 'gravity') {
             ctx.fillStyle = `rgba(255,160,0,${0.04 + Math.sin(frameCount * 0.08) * 0.02})`;
             ctx.fillRect(-5, -5, W + 10, H + 10);
+        }
+
+        // Plasma waves
+        for (let pw of plasmaWaves) {
+            let alpha = pw.life / 60;
+            ctx.beginPath();
+            ctx.arc(pw.x, pw.y, pw.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(0,238,255,${alpha * 0.8})`;
+            ctx.lineWidth = 5 * scale;
+            ctx.stroke();
+            ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.5})`;
+            ctx.lineWidth = 2 * scale;
+            ctx.stroke();
+        }
+
+        // Meteors
+        for (let m of meteors) {
+            ctx.save();
+            ctx.translate(m.x, m.y);
+            ctx.rotate(m.rotation);
+            ctx.fillStyle = '#f60';
+            ctx.beginPath();
+            // Jagged rock shape
+            for (let k = 0; k < 7; k++) {
+                let a = (k / 7) * Math.PI * 2;
+                let r = m.size * (0.7 + Math.sin(k * 3.7) * 0.3);
+                if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+                else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#fa0';
+            ctx.beginPath();
+            ctx.arc(0, 0, m.size * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Orbit drones
+        for (let d of orbitDrones) {
+            ctx.save();
+            ctx.translate(d.x, d.y);
+            ctx.rotate(frameCount * 0.1);
+            ctx.fillStyle = '#bf0';
+            // Small diamond drone
+            ctx.beginPath();
+            ctx.moveTo(0, -5 * scale);
+            ctx.lineTo(4 * scale, 0);
+            ctx.lineTo(0, 5 * scale);
+            ctx.lineTo(-4 * scale, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 2 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Photon torpedoes
+        for (let pt of photonTorpedoes) {
+            ctx.fillStyle = '#fa5';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 7 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 3 * scale, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = `rgba(255,170,80,${0.5 + Math.sin(frameCount * 0.2) * 0.3})`;
+            ctx.lineWidth = 2 * scale;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 10 * scale + Math.sin(frameCount * 0.15) * 3 * scale, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // Vortex beams
+        for (let vb of vortexBeams) {
+            let alpha = Math.min(vb.life / 15, 1);
+            let endX = player.x + Math.cos(vb.angle) * vb.length;
+            let endY = player.y + Math.sin(vb.angle) * vb.length;
+            ctx.save();
+            ctx.strokeStyle = `rgba(255,0,170,${alpha * 0.4})`;
+            ctx.lineWidth = 20 * scale;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.strokeStyle = `rgba(255,100,200,${alpha * 0.8})`;
+            ctx.lineWidth = 6 * scale;
+            ctx.stroke();
+            ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+            ctx.lineWidth = 2 * scale;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Supernova aura around player
+        if (supernovaActive) {
+            let hue = (frameCount * 6) % 360;
+            let pulseR = 35 * scale + Math.sin(frameCount * 0.15) * 8 * scale;
+            ctx.save();
+            ctx.strokeStyle = `hsl(${hue},100%,60%)`;
+            ctx.lineWidth = 4 * scale;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, pulseR, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = `hsl(${(hue + 120) % 360},100%,70%)`;
+            ctx.lineWidth = 2 * scale;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, pulseR + 8 * scale, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = `hsla(${hue},100%,50%,0.03)`;
+            ctx.fillRect(-5, -5, W + 10, H + 10);
+            ctx.restore();
+        }
+
+        // Freeze overlay
+        if (currentPowerUp === 'freeze') {
+            ctx.fillStyle = `rgba(136,255,255,${0.03 + Math.sin(frameCount * 0.06) * 0.01})`;
+            ctx.fillRect(-5, -5, W + 10, H + 10);
+        }
+
+        // Frozen enemy tint
+        for (let e of enemies) {
+            if (!e.alive || !e.frozen || e.frozen <= 0) continue;
+            ctx.fillStyle = `rgba(136,255,255,0.3)`;
+            ctx.fillRect(e.x - e.w * 0.5, e.y - e.h * 0.5, e.w, e.h);
         }
 
         // Enemies
@@ -1669,6 +2198,12 @@
         gravityFlipped = false;
         minigunAngle = 0;
         floatingTexts = [];
+        plasmaWaves = [];
+        meteors = [];
+        orbitDrones = [];
+        photonTorpedoes = [];
+        supernovaActive = false;
+        vortexBeams = [];
         formationX = 0;
         frameCount = 0;
         currentPowerUp = null;
