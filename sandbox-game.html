@@ -263,14 +263,30 @@
             return grid[getIndex(x, y)];
         }
 
+        function getNextCell(x, y) {
+            if (!inBounds(x, y)) return STONE;
+            return nextGrid[getIndex(x, y)];
+        }
+
         function setCell(x, y, value) {
             if (inBounds(x, y)) {
                 nextGrid[getIndex(x, y)] = value;
             }
         }
 
+        // Check if cell is empty in current grid
         function isEmpty(x, y) {
             return getCell(x, y) === EMPTY;
+        }
+
+        // Check if cell is available to move into (empty in both current AND next grid)
+        function canMoveTo(x, y) {
+            return inBounds(x, y) && getCell(x, y) === EMPTY && getNextCell(x, y) === EMPTY;
+        }
+
+        // Check if we can swap with a cell (it hasn't been claimed yet)
+        function canSwapWith(x, y) {
+            return inBounds(x, y) && getNextCell(x, y) === EMPTY;
         }
 
         function isLiquid(x, y) {
@@ -289,12 +305,12 @@
                 const nx = x + dir * i;
                 if (!inBounds(nx, y)) return 0;
                 const cell = getCell(nx, y);
-                if (cell === EMPTY) {
+                if (cell === EMPTY && canMoveTo(nx, y)) {
                     // Found empty horizontal space - check if we can fall from here
-                    if (isEmpty(nx, y + 1)) return i;
+                    if (canMoveTo(nx, y + 1)) return i;
                     // Check diagonal falls too
-                    if (isEmpty(nx + dir, y + 1)) return i;
-                } else if (cell !== liquidType) {
+                    if (canMoveTo(nx + dir, y + 1)) return i;
+                } else if (cell !== liquidType && cell !== EMPTY) {
                     return 0; // Hit a wall or different material
                 }
             }
@@ -317,17 +333,17 @@
         function updateSand(x, y) {
             const below = getCell(x, y + 1);
 
-            if (below === EMPTY) {
+            // Fall straight down into empty space
+            if (below === EMPTY && canMoveTo(x, y + 1)) {
                 setCell(x, y + 1, SAND);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
 
             // Sand sinks through liquids
-            if (below === WATER || below === OIL) {
+            if ((below === WATER || below === OIL) && canSwapWith(x, y + 1)) {
                 setCell(x, y + 1, SAND);
                 setCell(x, y, below);
-                return;
+                return true;
             }
 
             // Try diagonal
@@ -335,48 +351,55 @@
             const diag1 = getCell(x + dir, y + 1);
             const diag2 = getCell(x - dir, y + 1);
 
-            if (diag1 === EMPTY || diag1 === WATER || diag1 === OIL) {
+            if (diag1 === EMPTY && canMoveTo(x + dir, y + 1)) {
                 setCell(x + dir, y + 1, SAND);
-                setCell(x, y, diag1 === EMPTY ? EMPTY : diag1);
-                return;
+                return true;
             }
-            if (diag2 === EMPTY || diag2 === WATER || diag2 === OIL) {
+            if ((diag1 === WATER || diag1 === OIL) && canSwapWith(x + dir, y + 1)) {
+                setCell(x + dir, y + 1, SAND);
+                setCell(x, y, diag1);
+                return true;
+            }
+            if (diag2 === EMPTY && canMoveTo(x - dir, y + 1)) {
                 setCell(x - dir, y + 1, SAND);
-                setCell(x, y, diag2 === EMPTY ? EMPTY : diag2);
-                return;
+                return true;
+            }
+            if ((diag2 === WATER || diag2 === OIL) && canSwapWith(x - dir, y + 1)) {
+                setCell(x - dir, y + 1, SAND);
+                setCell(x, y, diag2);
+                return true;
             }
 
+            // Stay in place
             setCell(x, y, SAND);
+            return false;
         }
 
         function updateWater(x, y) {
             const below = getCell(x, y + 1);
 
             // Priority 1: Fall straight down
-            if (below === EMPTY) {
+            if (below === EMPTY && canMoveTo(x, y + 1)) {
                 setCell(x, y + 1, WATER);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
 
             // Priority 2: Sink below oil (water is denser)
-            if (below === OIL) {
+            if (below === OIL && canSwapWith(x, y + 1)) {
                 setCell(x, y + 1, WATER);
                 setCell(x, y, OIL);
-                return;
+                return true;
             }
 
             // Priority 3: Try diagonal down
             const dir = Math.random() < 0.5 ? -1 : 1;
-            if (isEmpty(x + dir, y + 1)) {
+            if (canMoveTo(x + dir, y + 1)) {
                 setCell(x + dir, y + 1, WATER);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
-            if (isEmpty(x - dir, y + 1)) {
+            if (canMoveTo(x - dir, y + 1)) {
                 setCell(x - dir, y + 1, WATER);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
 
             // Priority 4: Find a path to fall - smart horizontal movement
@@ -392,85 +415,73 @@
                     moveDir = leftPath > 0 ? -1 : 1;
                 }
 
-                if (isEmpty(x + moveDir, y)) {
+                if (canMoveTo(x + moveDir, y)) {
                     setCell(x + moveDir, y, WATER);
-                    setCell(x, y, EMPTY);
-                    return;
+                    return true;
                 }
             }
 
             // Priority 5: Pressure-based spreading
-            // Water under pressure spreads more aggressively to find equilibrium
             const pressure = getPressure(x, y, WATER);
             const spreadChance = 0.3 + (pressure * 0.1);
 
             if (Math.random() < spreadChance) {
-                // Try to equalize - look for lower water levels nearby
-                const leftEmpty = isEmpty(x - 1, y);
-                const rightEmpty = isEmpty(x + 1, y);
+                const leftOpen = canMoveTo(x - 1, y);
+                const rightOpen = canMoveTo(x + 1, y);
 
-                if (leftEmpty && rightEmpty) {
-                    // Both sides open - pick randomly
+                if (leftOpen && rightOpen) {
                     const moveDir = Math.random() < 0.5 ? -1 : 1;
                     setCell(x + moveDir, y, WATER);
-                    setCell(x, y, EMPTY);
-                    return;
-                } else if (leftEmpty) {
+                    return true;
+                } else if (leftOpen) {
                     setCell(x - 1, y, WATER);
-                    setCell(x, y, EMPTY);
-                    return;
-                } else if (rightEmpty) {
+                    return true;
+                } else if (rightOpen) {
                     setCell(x + 1, y, WATER);
-                    setCell(x, y, EMPTY);
-                    return;
+                    return true;
                 }
             }
 
-            // Priority 6: If under high pressure and blocked, try to rise up through empty space
-            // This simulates pressure pushing water up in connected vessels
-            if (pressure >= 3 && isEmpty(x, y - 1)) {
-                // Check if there's a path for pressure relief
-                const canReliefLeft = isEmpty(x - 1, y - 1) || isEmpty(x - 1, y);
-                const canReliefRight = isEmpty(x + 1, y - 1) || isEmpty(x + 1, y);
+            // Priority 6: High pressure can push water up
+            if (pressure >= 3 && canMoveTo(x, y - 1)) {
+                const canReliefLeft = canMoveTo(x - 1, y - 1) || canMoveTo(x - 1, y);
+                const canReliefRight = canMoveTo(x + 1, y - 1) || canMoveTo(x + 1, y);
                 if (canReliefLeft || canReliefRight) {
                     setCell(x, y - 1, WATER);
-                    setCell(x, y, EMPTY);
-                    return;
+                    return true;
                 }
             }
 
-            // Stay in place - this allows water to stack and fill containers
+            // Stay in place
             setCell(x, y, WATER);
+            return false;
         }
 
         function updateOil(x, y) {
             const below = getCell(x, y + 1);
 
             // Fall down
-            if (below === EMPTY) {
+            if (below === EMPTY && canMoveTo(x, y + 1)) {
                 setCell(x, y + 1, OIL);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
 
             // Oil floats on water - if water is above, swap
-            if (getCell(x, y - 1) === WATER) {
+            if (getCell(x, y - 1) === WATER && canSwapWith(x, y - 1)) {
                 setCell(x, y - 1, OIL);
                 setCell(x, y, WATER);
-                return;
+                return true;
             }
 
             // Try diagonal
             const dir = Math.random() < 0.5 ? -1 : 1;
-            if (isEmpty(x + dir, y + 1)) {
+            if (canMoveTo(x + dir, y + 1)) {
                 setCell(x + dir, y + 1, OIL);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
-            if (isEmpty(x - dir, y + 1)) {
+            if (canMoveTo(x - dir, y + 1)) {
                 setCell(x - dir, y + 1, OIL);
-                setCell(x, y, EMPTY);
-                return;
+                return true;
             }
 
             // Find path to fall
@@ -485,10 +496,9 @@
                     moveDir = leftPath > 0 ? -1 : 1;
                 }
 
-                if (isEmpty(x + moveDir, y)) {
+                if (canMoveTo(x + moveDir, y)) {
                     setCell(x + moveDir, y, OIL);
-                    setCell(x, y, EMPTY);
-                    return;
+                    return true;
                 }
             }
 
@@ -497,48 +507,49 @@
             const spreadChance = 0.25 + (pressure * 0.08);
 
             if (Math.random() < spreadChance) {
-                if (isEmpty(x + dir, y)) {
+                if (canMoveTo(x + dir, y)) {
                     setCell(x + dir, y, OIL);
-                    setCell(x, y, EMPTY);
-                    return;
+                    return true;
                 }
-                if (isEmpty(x - dir, y)) {
+                if (canMoveTo(x - dir, y)) {
                     setCell(x - dir, y, OIL);
-                    setCell(x, y, EMPTY);
-                    return;
+                    return true;
                 }
             }
 
+            // Stay in place
             setCell(x, y, OIL);
+            return false;
         }
 
         function updateFire(x, y) {
-            // Fire rises and dies
+            // Fire dies randomly
             if (Math.random() < 0.1) {
-                setCell(x, y, EMPTY);
-                return;
+                return; // Don't set anything - fire disappears
             }
 
             // Spread to nearby oil or plant
             for (let dx = -1; dx <= 1; dx++) {
                 for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
                     const neighbor = getCell(x + dx, y + dy);
-                    if (neighbor === OIL || neighbor === PLANT) {
-                        if (Math.random() < 0.3) {
+                    if ((neighbor === OIL || neighbor === PLANT) && Math.random() < 0.3) {
+                        if (canSwapWith(x + dx, y + dy)) {
                             setCell(x + dx, y + dy, FIRE);
                         }
                     }
                     // Evaporate water
                     if (neighbor === WATER && Math.random() < 0.05) {
-                        setCell(x + dx, y + dy, EMPTY);
+                        if (canSwapWith(x + dx, y + dy)) {
+                            setCell(x + dx, y + dy, EMPTY);
+                        }
                     }
                 }
             }
 
             // Rise up
-            if (isEmpty(x, y - 1) && Math.random() < 0.7) {
+            if (canMoveTo(x, y - 1) && Math.random() < 0.7) {
                 setCell(x, y - 1, FIRE);
-                setCell(x, y, EMPTY);
             } else {
                 setCell(x, y, FIRE);
             }
@@ -546,13 +557,13 @@
 
         function updatePlant(x, y) {
             // Grow upward occasionally
-            if (Math.random() < 0.002 && isEmpty(x, y - 1)) {
+            if (Math.random() < 0.002 && canMoveTo(x, y - 1)) {
                 setCell(x, y - 1, PLANT);
             }
             // Grow sideways rarely
             if (Math.random() < 0.001) {
                 const dir = Math.random() < 0.5 ? -1 : 1;
-                if (isEmpty(x + dir, y)) {
+                if (canMoveTo(x + dir, y)) {
                     setCell(x + dir, y, PLANT);
                 }
             }
@@ -562,12 +573,15 @@
         function updateLava(x, y) {
             const below = getCell(x, y + 1);
 
-            // Set nearby things on fire first
+            // Set nearby things on fire first (but check availability)
             for (let dx = -1; dx <= 1; dx++) {
                 for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
                     const neighbor = getCell(x + dx, y + dy);
                     if ((neighbor === OIL || neighbor === PLANT) && Math.random() < 0.4) {
-                        setCell(x + dx, y + dy, FIRE);
+                        if (canSwapWith(x + dx, y + dy)) {
+                            setCell(x + dx, y + dy, FIRE);
+                        }
                     }
                 }
             }
@@ -578,22 +592,21 @@
                 return;
             }
 
-            // Fall down
-            if (below === EMPTY) {
+            // Fall down into empty space
+            if (below === EMPTY && canMoveTo(x, y + 1)) {
                 setCell(x, y + 1, LAVA);
-                setCell(x, y, EMPTY);
                 return;
             }
 
-            // Turn water to stone (steam effect)
-            if (below === WATER) {
+            // Turn water to stone
+            if (below === WATER && canSwapWith(x, y + 1)) {
                 setCell(x, y + 1, STONE);
                 setCell(x, y, LAVA);
                 return;
             }
 
             // Ignite oil
-            if (below === OIL) {
+            if (below === OIL && canSwapWith(x, y + 1)) {
                 setCell(x, y + 1, FIRE);
                 setCell(x, y, LAVA);
                 return;
@@ -604,22 +617,20 @@
             const diag1 = getCell(x + dir, y + 1);
             const diag2 = getCell(x - dir, y + 1);
 
-            if (diag1 === EMPTY) {
+            if (diag1 === EMPTY && canMoveTo(x + dir, y + 1)) {
                 setCell(x + dir, y + 1, LAVA);
-                setCell(x, y, EMPTY);
                 return;
             }
-            if (diag1 === WATER) {
+            if (diag1 === WATER && canSwapWith(x + dir, y + 1)) {
                 setCell(x + dir, y + 1, STONE);
                 setCell(x, y, LAVA);
                 return;
             }
-            if (diag2 === EMPTY) {
+            if (diag2 === EMPTY && canMoveTo(x - dir, y + 1)) {
                 setCell(x - dir, y + 1, LAVA);
-                setCell(x, y, EMPTY);
                 return;
             }
-            if (diag2 === WATER) {
+            if (diag2 === WATER && canSwapWith(x - dir, y + 1)) {
                 setCell(x - dir, y + 1, STONE);
                 setCell(x, y, LAVA);
                 return;
@@ -628,19 +639,17 @@
             // Spread horizontally (slow, viscous)
             const pressure = getPressure(x, y, LAVA);
             if (Math.random() < 0.15 + (pressure * 0.05)) {
-                if (isEmpty(x + dir, y)) {
+                if (canMoveTo(x + dir, y)) {
                     setCell(x + dir, y, LAVA);
-                    setCell(x, y, EMPTY);
                     return;
                 }
-                if (getCell(x + dir, y) === WATER) {
+                if (getCell(x + dir, y) === WATER && canSwapWith(x + dir, y)) {
                     setCell(x + dir, y, STONE);
                     setCell(x, y, LAVA);
                     return;
                 }
-                if (isEmpty(x - dir, y)) {
+                if (canMoveTo(x - dir, y)) {
                     setCell(x - dir, y, LAVA);
-                    setCell(x, y, EMPTY);
                     return;
                 }
             }
