@@ -882,13 +882,13 @@
             let l = lasers[i];
             l.life--;
             if (l.life <= 0) { lasers.splice(i, 1); continue; }
-            // Laser damages all enemies it touches
+            // Laser instantly kills all enemies it touches
             for (let e of enemies) {
                 if (!e.alive) continue;
                 if (Math.abs(l.x - e.x) < l.width / 2 + e.w * 0.4 && e.y < l.y && e.y > 0) {
-                    if (frameCount % 3 === 0) { // damage every 3 frames
-                        hitEnemy(e);
-                    }
+                    // Instant kill - set HP to 1 so hitEnemy destroys it
+                    e.hp = 1;
+                    hitEnemy(e);
                 }
             }
         }
