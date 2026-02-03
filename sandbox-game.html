@@ -289,6 +289,42 @@
             return inBounds(x, y) && getNextCell(x, y) === EMPTY;
         }
 
+        // Density values for swap calculations (higher = sinks)
+        const density = {
+            [EMPTY]: 0,
+            [FIRE]: 1,
+            [OIL]: 2,
+            [WATER]: 3,
+            [SAND]: 5,
+            [LAVA]: 6,
+            [STONE]: 10,
+            [PLANT]: 10
+        };
+
+        // Check if particle A can sink into particle B's position (density-based swap)
+        // This allows overwriting because the denser particle should be below
+        function canSinkInto(x, y, sinkingType) {
+            if (!inBounds(x, y)) return false;
+            const targetType = getCell(x, y);
+            const nextType = getNextCell(x, y);
+
+            // Can always move into empty space
+            if (targetType === EMPTY && nextType === EMPTY) return true;
+
+            // For density swaps: the sinking particle must be denser
+            // Allow overwriting if we're denser than what's there
+            if (density[sinkingType] > density[targetType]) {
+                return true;
+            }
+            return false;
+        }
+
+        // Perform a density-based swap
+        function doSwap(fromX, fromY, toX, toY, sinkingType, displacedType) {
+            setCell(toX, toY, sinkingType);
+            setCell(fromX, fromY, displacedType);
+        }
+
         function isLiquid(x, y) {
             const cell = getCell(x, y);
             return cell === WATER || cell === OIL;
@@ -333,16 +369,14 @@
         function updateSand(x, y) {
             const below = getCell(x, y + 1);
 
-            // Fall straight down into empty space
-            if (below === EMPTY && canMoveTo(x, y + 1)) {
-                setCell(x, y + 1, SAND);
-                return true;
-            }
-
-            // Sand sinks through liquids
-            if ((below === WATER || below === OIL) && canSwapWith(x, y + 1)) {
-                setCell(x, y + 1, SAND);
-                setCell(x, y, below);
+            // Fall straight down - use density-based sinking
+            if (canSinkInto(x, y + 1, SAND)) {
+                if (below === EMPTY) {
+                    setCell(x, y + 1, SAND);
+                } else {
+                    // Swap with liquid
+                    doSwap(x, y, x, y + 1, SAND, below);
+                }
                 return true;
             }
 
@@ -351,22 +385,20 @@
             const diag1 = getCell(x + dir, y + 1);
             const diag2 = getCell(x - dir, y + 1);
 
-            if (diag1 === EMPTY && canMoveTo(x + dir, y + 1)) {
-                setCell(x + dir, y + 1, SAND);
+            if (canSinkInto(x + dir, y + 1, SAND)) {
+                if (diag1 === EMPTY) {
+                    setCell(x + dir, y + 1, SAND);
+                } else {
+                    doSwap(x, y, x + dir, y + 1, SAND, diag1);
+                }
                 return true;
             }
-            if ((diag1 === WATER || diag1 === OIL) && canSwapWith(x + dir, y + 1)) {
-                setCell(x + dir, y + 1, SAND);
-                setCell(x, y, diag1);
-                return true;
-            }
-            if (diag2 === EMPTY && canMoveTo(x - dir, y + 1)) {
-                setCell(x - dir, y + 1, SAND);
-                return true;
-            }
-            if ((diag2 === WATER || diag2 === OIL) && canSwapWith(x - dir, y + 1)) {
-                setCell(x - dir, y + 1, SAND);
-                setCell(x, y, diag2);
+            if (canSinkInto(x - dir, y + 1, SAND)) {
+                if (diag2 === EMPTY) {
+                    setCell(x - dir, y + 1, SAND);
+                } else {
+                    doSwap(x, y, x - dir, y + 1, SAND, diag2);
+                }
                 return true;
             }
 
@@ -378,35 +410,43 @@
         function updateWater(x, y) {
             const below = getCell(x, y + 1);
 
-            // Priority 1: Fall straight down
-            if (below === EMPTY && canMoveTo(x, y + 1)) {
-                setCell(x, y + 1, WATER);
+            // Priority 1: Fall straight down or sink through lighter liquids
+            if (canSinkInto(x, y + 1, WATER)) {
+                if (below === EMPTY) {
+                    setCell(x, y + 1, WATER);
+                } else {
+                    // Swap with oil (water sinks, oil rises)
+                    doSwap(x, y, x, y + 1, WATER, below);
+                }
                 return true;
             }
 
-            // Priority 2: Sink below oil (water is denser)
-            if (below === OIL && canSwapWith(x, y + 1)) {
-                setCell(x, y + 1, WATER);
-                setCell(x, y, OIL);
-                return true;
-            }
-
-            // Priority 3: Try diagonal down
+            // Priority 2: Try diagonal down
             const dir = Math.random() < 0.5 ? -1 : 1;
-            if (canMoveTo(x + dir, y + 1)) {
-                setCell(x + dir, y + 1, WATER);
+            const diag1 = getCell(x + dir, y + 1);
+            const diag2 = getCell(x - dir, y + 1);
+
+            if (canSinkInto(x + dir, y + 1, WATER)) {
+                if (diag1 === EMPTY) {
+                    setCell(x + dir, y + 1, WATER);
+                } else {
+                    doSwap(x, y, x + dir, y + 1, WATER, diag1);
+                }
                 return true;
             }
-            if (canMoveTo(x - dir, y + 1)) {
-                setCell(x - dir, y + 1, WATER);
+            if (canSinkInto(x - dir, y + 1, WATER)) {
+                if (diag2 === EMPTY) {
+                    setCell(x - dir, y + 1, WATER);
+                } else {
+                    doSwap(x, y, x - dir, y + 1, WATER, diag2);
+                }
                 return true;
             }
 
-            // Priority 4: Find a path to fall - smart horizontal movement
+            // Priority 3: Find a path to fall - smart horizontal movement
             const leftPath = findFallPath(x, y, -1, WATER);
             const rightPath = findFallPath(x, y, 1, WATER);
 
-            // Move toward the closest fall opportunity
             if (leftPath > 0 || rightPath > 0) {
                 let moveDir = 0;
                 if (leftPath > 0 && rightPath > 0) {
@@ -421,7 +461,7 @@
                 }
             }
 
-            // Priority 5: Pressure-based spreading
+            // Priority 4: Pressure-based spreading
             const pressure = getPressure(x, y, WATER);
             const spreadChance = 0.3 + (pressure * 0.1);
 
@@ -460,20 +500,13 @@
         function updateOil(x, y) {
             const below = getCell(x, y + 1);
 
-            // Fall down
+            // Fall down into empty space
             if (below === EMPTY && canMoveTo(x, y + 1)) {
                 setCell(x, y + 1, OIL);
                 return true;
             }
 
-            // Oil floats on water - if water is above, swap
-            if (getCell(x, y - 1) === WATER && canSwapWith(x, y - 1)) {
-                setCell(x, y - 1, OIL);
-                setCell(x, y, WATER);
-                return true;
-            }
-
-            // Try diagonal
+            // Try diagonal down
             const dir = Math.random() < 0.5 ? -1 : 1;
             if (canMoveTo(x + dir, y + 1)) {
                 setCell(x + dir, y + 1, OIL);
