@@ -161,6 +161,17 @@
             transition: opacity 0.3s;
         }
 
+        #muteBtn {
+            pointer-events: auto;
+            cursor: pointer;
+            color: #0f0;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            font-size: clamp(14px, 3.5vw, 20px);
+        }
+        #muteBtn:active { opacity: 1; }
+        #muteBtn.muted { color: #555; }
+
         #touchZone {
             position: absolute;
             bottom: 0;
@@ -180,6 +191,7 @@
         <span id="scoreHud">SCORE: 0</span>
         <span id="stageHud">STAGE 1</span>
         <span id="lives">♥♥♥</span>
+        <span id="muteBtn">♫</span>
     </div>
     <div id="powerUpHud" aria-hidden="true"></div>
 
@@ -258,6 +270,335 @@
     let photonTorpedoes = [];
     let supernovaActive = false;
     let vortexBeams = [];
+
+    // ===== SOUND SYSTEM (Web Audio API) =====
+    const Sound = {
+        ctx: null,
+        masterGain: null,
+        muted: false,
+        musicPlaying: false,
+        musicTimeout: null,
+        noiseBuffer: null,
+        musicStep: 0,
+        musicBPM: 140,
+        musicNextNoteTime: 0,
+
+        init() {
+            try {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.connect(this.ctx.destination);
+                this.masterGain.gain.value = 0.5;
+                // Pre-create noise buffer for efficiency
+                const size = this.ctx.sampleRate;
+                this.noiseBuffer = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+                const data = this.noiseBuffer.getChannelData(0);
+                for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+            } catch(e) {}
+        },
+
+        resume() {
+            if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        },
+
+        toggleMute() {
+            this.muted = !this.muted;
+            if (this.masterGain) this.masterGain.gain.value = this.muted ? 0 : 0.5;
+            const btn = document.getElementById('muteBtn');
+            if (btn) {
+                btn.textContent = this.muted ? '♪' : '♫';
+                btn.classList.toggle('muted', this.muted);
+            }
+        },
+
+        // Helper: play a tone with envelope
+        playTone(freq, type, duration, volume, startTime) {
+            if (!this.ctx) return;
+            const t = startTime || this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type || 'square';
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(volume || 0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + duration + 0.01);
+        },
+
+        // Helper: play noise burst
+        playNoise(duration, volume, startTime) {
+            if (!this.ctx || !this.noiseBuffer) return;
+            const t = startTime || this.ctx.currentTime;
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.noiseBuffer;
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(volume || 0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+            noise.connect(gain);
+            gain.connect(this.masterGain);
+            noise.start(t);
+            noise.stop(t + duration + 0.01);
+        },
+
+        // --- SOUND EFFECTS ---
+
+        shoot() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(1200, t);
+            osc.frequency.exponentialRampToValueAtTime(200, t + 0.06);
+            gain.gain.setValueAtTime(0.07, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + 0.07);
+        },
+
+        shootLaser() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(800, t);
+            osc.frequency.setValueAtTime(900, t + 0.04);
+            osc.frequency.setValueAtTime(800, t + 0.08);
+            gain.gain.setValueAtTime(0.09, t);
+            gain.gain.linearRampToValueAtTime(0.05, t + 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + 0.13);
+        },
+
+        shootHeavy() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            this.playNoise(0.12, 0.05, t);
+            this.playTone(180, 'sawtooth', 0.15, 0.06, t);
+        },
+
+        shootSpread() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(1400, t);
+            osc.frequency.exponentialRampToValueAtTime(400, t + 0.07);
+            gain.gain.setValueAtTime(0.06, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + 0.08);
+        },
+
+        shootZap() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(2000, t);
+            osc.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+            gain.gain.setValueAtTime(0.08, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + 0.11);
+            this.playNoise(0.04, 0.03, t);
+        },
+
+        enemyHit() {
+            if (!this.ctx) return;
+            this.playNoise(0.06, 0.06);
+            this.playTone(150, 'sine', 0.08, 0.06);
+        },
+
+        enemyDeath() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            this.playNoise(0.18, 0.1, t);
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(280, t);
+            osc.frequency.exponentialRampToValueAtTime(40, t + 0.22);
+            gain.gain.setValueAtTime(0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + 0.23);
+        },
+
+        playerDamage() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            this.playNoise(0.3, 0.12, t);
+            this.playTone(80, 'square', 0.3, 0.12, t);
+            this.playTone(55, 'sine', 0.4, 0.08, t);
+        },
+
+        shieldBlock() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            this.playTone(1200, 'sine', 0.12, 0.07, t);
+            this.playTone(1800, 'sine', 0.08, 0.04, t + 0.01);
+        },
+
+        powerUp() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            [523, 659, 784, 1047].forEach((freq, i) => {
+                this.playTone(freq, 'square', 0.1, 0.06, t + i * 0.055);
+            });
+        },
+
+        supernovaActivate() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(100, t);
+            osc.frequency.exponentialRampToValueAtTime(2000, t + 0.7);
+            gain.gain.setValueAtTime(0.08, t);
+            gain.gain.linearRampToValueAtTime(0.12, t + 0.35);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t);
+            osc.stop(t + 0.91);
+            this.playNoise(0.4, 0.06, t + 0.25);
+        },
+
+        combo(count) {
+            if (!this.ctx) return;
+            const freq = 600 + Math.min(count, 8) * 100;
+            this.playTone(freq, 'square', 0.05, 0.04);
+        },
+
+        stageClear() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            [440, 554, 659, 880].forEach((freq, i) => {
+                this.playTone(freq, 'square', 0.25, 0.05, t + i * 0.09);
+            });
+            [440, 554, 659, 880].forEach((freq) => {
+                this.playTone(freq, 'sine', 0.4, 0.03, t + 0.36);
+            });
+        },
+
+        gameOverSound() {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            [440, 392, 330, 262, 220].forEach((freq, i) => {
+                this.playTone(freq, 'square', 0.22, 0.07, t + i * 0.18);
+            });
+        },
+
+        // --- BACKGROUND MUSIC (chip-tune arcade) ---
+
+        startMusic() {
+            if (!this.ctx) return;
+            this.musicPlaying = true;
+            this.musicStep = 0;
+            this.musicBPM = 140 + Math.min(stage - 1, 15) * 2;
+            this.musicNextNoteTime = this.ctx.currentTime + 0.1;
+            this.scheduleMusic();
+        },
+
+        stopMusic() {
+            this.musicPlaying = false;
+            if (this.musicTimeout) {
+                clearTimeout(this.musicTimeout);
+                this.musicTimeout = null;
+            }
+        },
+
+        scheduleMusic() {
+            if (!this.musicPlaying || !this.ctx) return;
+            // Update BPM at loop boundaries
+            if (this.musicStep === 0) {
+                this.musicBPM = 140 + Math.min(stage - 1, 15) * 2;
+            }
+            const secondsPerBeat = 60 / this.musicBPM;
+            const stepDur = secondsPerBeat / 4; // 16th notes
+
+            while (this.musicNextNoteTime < this.ctx.currentTime + 0.1) {
+                this.playMusicNote(this.musicStep, this.musicNextNoteTime, stepDur);
+                this.musicStep = (this.musicStep + 1) % 64; // 4 bars * 16 steps
+                this.musicNextNoteTime += stepDur;
+            }
+            this.musicTimeout = setTimeout(() => this.scheduleMusic(), 25);
+        },
+
+        playMusicNote(step, time, stepDur) {
+            const bar = Math.floor(step / 16);
+            const beat = step % 16;
+
+            // Chord progression: Am - F - C - G
+            const bassFreqs = [110, 87.31, 130.81, 98]; // A2, F2, C3, G2
+            const arpSets = [
+                [440, 523, 659, 880],  // Am: A4 C5 E5 A5
+                [349, 440, 523, 698],  // F:  F4 A4 C5 F5
+                [262, 330, 392, 523],  // C:  C4 E4 G4 C5
+                [392, 494, 587, 784]   // G:  G4 B4 D5 G5
+            ];
+            const arpIndices = [0,1,2,3, 2,1,0,1, 2,3,2,1, 0,1,2,3];
+
+            // Bass on beats 0, 4, 8, 12
+            if (beat % 4 === 0) {
+                this.playTone(bassFreqs[bar], 'square', stepDur * 3.5, 0.03, time);
+            }
+
+            // Arpeggio every 16th note
+            this.playTone(arpSets[bar][arpIndices[beat]], 'square', stepDur * 0.7, 0.018, time);
+
+            // Hi-hat on even beats
+            if (beat % 2 === 0) {
+                this.playNoise(0.015, 0.012, time);
+            }
+
+            // Kick on 0, 8
+            if (beat === 0 || beat === 8) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(150, time);
+                osc.frequency.exponentialRampToValueAtTime(30, time + 0.08);
+                gain.gain.setValueAtTime(0.06, time);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+                osc.connect(gain);
+                gain.connect(this.masterGain);
+                osc.start(time);
+                osc.stop(time + 0.11);
+            }
+
+            // Snare on 4, 12
+            if (beat === 4 || beat === 12) {
+                this.playNoise(0.05, 0.025, time);
+                this.playTone(180, 'triangle', 0.03, 0.02, time);
+            }
+        }
+    };
+    Sound.init();
+
+    // Score formatting helper
+    function formatScore(n) { return n.toLocaleString(); }
+    function updateScoreHud() {
+        document.getElementById('scoreHud').textContent = 'SCORE: ' + formatScore(score);
+    }
 
     // Power-up definitions
     const POWERUP_TYPES = [
@@ -833,6 +1174,7 @@
             document.getElementById('stageHud').textContent = 'STAGE ' + stage;
             spawnWave();
             spawnFloatingText(W / 2, H / 2, 'STAGE ' + stage, '#ff0');
+            Sound.stageClear();
         }
 
         // --- PLAYER BULLETS ---
@@ -1354,7 +1696,7 @@
             let multiplier = Math.min(comboCount, 8);
             let pts = baseScore * multiplier;
             score += pts;
-            document.getElementById('scoreHud').textContent = 'SCORE: ' + score;
+            updateScoreHud();
             spawnExplosion(e.x, e.y, ENEMY_TYPES[e.type].color, e.type === 2 ? 1.5 : 1);
             if (multiplier > 1) {
                 spawnFloatingText(e.x, e.y - 15, pts + ' x' + multiplier, '#ff0');
@@ -1362,12 +1704,17 @@
                 spawnFloatingText(e.x, e.y - 15, '+' + pts, '#fff');
             }
             dropPowerUp(e.x, e.y);
+            Sound.enemyDeath();
+            if (multiplier > 1) Sound.combo(comboCount);
         } else {
             spawnParticles(e.x, e.y, '#fff', 5, 3);
+            Sound.enemyHit();
         }
     }
 
     function activatePowerUp(type, label, color) {
+        if (type === 'supernova') Sound.supernovaActivate();
+        else Sound.powerUp();
         currentPowerUp = type;
         powerUpTimer = POWERUP_DURATION;
         powerUpHud.textContent = label;
@@ -1406,6 +1753,7 @@
             shieldHP--;
             screenShake = 5;
             spawnParticles(player.x, player.y, '#0f0', 10, 5);
+            Sound.shieldBlock();
             if (shieldHP <= 0) {
                 currentPowerUp = null;
                 powerUpHud.style.opacity = '0';
@@ -1413,6 +1761,7 @@
             return;
         }
         lives--;
+        Sound.playerDamage();
         spawnExplosion(player.x, player.y, '#f44', 2.5);
         spawnExplosion(player.x, player.y, '#fff', 1.5);
         screenShake = 35;
@@ -1546,6 +1895,7 @@
                     if (current.hp <= 0) {
                         current.alive = false;
                         score += ENEMY_TYPES[current.type].score;
+                        updateScoreHud();
                         spawnExplosion(current.x, current.y, ENEMY_TYPES[current.type].color, 1);
                         dropPowerUp(current.x, current.y);
                     }
@@ -1693,6 +2043,15 @@
                 y: player.y - player.h * 0.5,
                 vy: -8 * scale
             });
+        }
+
+        // Play appropriate shoot sound
+        switch (currentPowerUp) {
+            case 'laser': Sound.shootLaser(); break;
+            case 'missile': case 'photon': case 'blackhole': case 'meteor': Sound.shootHeavy(); break;
+            case 'spread': case 'supernova': Sound.shootSpread(); break;
+            case 'lightning': Sound.shootZap(); break;
+            default: Sound.shoot(); break;
         }
     }
 
@@ -2283,7 +2642,7 @@
         player.x = W / 2;
         player.y = H - 100 * scale;
         powerUpHud.style.opacity = '0';
-        document.getElementById('scoreHud').textContent = 'SCORE: 0';
+        updateScoreHud();
         document.getElementById('stageHud').textContent = 'STAGE 1';
         updateLivesHud();
         spawnWave();
@@ -2294,19 +2653,23 @@
             if (gameRunning) fire();
         }, FIRE_RATE);
 
+        Sound.resume();
+        Sound.startMusic();
         gameLoop();
     }
 
     function gameOver() {
         gameRunning = false;
+        Sound.stopMusic();
+        Sound.gameOverSound();
         if (autoFireInterval) { clearInterval(autoFireInterval); autoFireInterval = null; }
         if (animId) { cancelAnimationFrame(animId); animId = null; }
         if (score > hiScore) {
             hiScore = score;
             localStorage.setItem('galagaHi', hiScore);
         }
-        document.getElementById('finalScore').textContent = 'SCORE: ' + score;
-        document.getElementById('hiScoreText').textContent = 'HI-SCORE: ' + hiScore;
+        document.getElementById('finalScore').textContent = 'SCORE: ' + formatScore(score);
+        document.getElementById('hiScoreText').textContent = 'HI-SCORE: ' + formatScore(hiScore);
         document.getElementById('gameOverScreen').style.display = 'flex';
     }
 
@@ -2362,6 +2725,14 @@
     document.getElementById('startBtn').addEventListener('touchend', function(e) { e.preventDefault(); startGame(); });
     document.getElementById('restartBtn').addEventListener('click', startGame);
     document.getElementById('restartBtn').addEventListener('touchend', function(e) { e.preventDefault(); startGame(); });
+
+    document.getElementById('muteBtn').addEventListener('click', function() { Sound.toggleMute(); });
+    document.getElementById('muteBtn').addEventListener('touchend', function(e) { e.preventDefault(); Sound.toggleMute(); });
+
+    // Also add keyboard shortcut 'm' for mute
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'm' || e.key === 'M') Sound.toggleMute();
+    });
 
     document.addEventListener('touchmove', function(e) {
         if (e.target === document.body || e.target === document.documentElement) e.preventDefault();
