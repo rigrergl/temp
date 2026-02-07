@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Skee-Ball Arcade</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    overflow: hidden;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  canvas {
+    display: block;
+    image-rendering: auto;
+  }
+
+  #ui-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  #score-display {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #ff0;
+    font-size: 20px;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    text-shadow: 0 0 10px #ff0, 0 0 20px #f80;
+    pointer-events: none;
+    z-index: 20;
+  }
+
+  #score-display .label { font-size: 12px; color: #f80; }
+  #score-display .score { font-size: 36px; font-weight: bold; }
+  #score-display .balls { font-size: 14px; color: #0ff; margin-top: 2px; }
+  #score-display .high-score { font-size: 12px; color: #f0f; margin-top: 2px; }
+
+  #popup {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 28px;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    pointer-events: none;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-shadow: 0 0 15px #f0f, 0 0 30px #f0f;
+  }
+
+  #popup.visible { opacity: 1; }
+
+  #game-over-screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 50;
+    pointer-events: auto;
+  }
+
+  #game-over-screen.visible { display: flex; }
+
+  #game-over-screen h1 {
+    color: #ff0;
+    font-size: 36px;
+    text-shadow: 0 0 20px #ff0;
+    margin-bottom: 10px;
+    font-family: 'Courier New', monospace;
+  }
+
+  #game-over-screen .final-score {
+    color: #0ff;
+    font-size: 48px;
+    font-weight: bold;
+    text-shadow: 0 0 20px #0ff;
+    font-family: 'Courier New', monospace;
+  }
+
+  #game-over-screen .new-high {
+    color: #f0f;
+    font-size: 20px;
+    text-shadow: 0 0 15px #f0f;
+    margin-top: 5px;
+    font-family: 'Courier New', monospace;
+    display: none;
+  }
+
+  #game-over-screen .play-again {
+    margin-top: 30px;
+    padding: 15px 40px;
+    background: linear-gradient(180deg, #f0f, #80f);
+    border: 2px solid #fff;
+    color: #fff;
+    font-size: 22px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    border-radius: 8px;
+    text-shadow: 0 0 5px #fff;
+    box-shadow: 0 0 20px #f0f;
+    pointer-events: auto;
+  }
+
+  #swipe-hint {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    pointer-events: none;
+    z-index: 20;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  #point-flash {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 60px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    pointer-events: none;
+    z-index: 25;
+    opacity: 0;
+    color: #ff0;
+    text-shadow: 0 0 20px #ff0, 0 0 40px #f80;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="ui-overlay">
+  <div id="score-display">
+    <div class="label">SKEE-BALL</div>
+    <div class="score" id="scoreVal">0</div>
+    <div class="balls" id="ballsLeft">BALLS: 9</div>
+    <div class="high-score" id="highScoreVal">HI: 0</div>
+  </div>
+  <div id="popup"></div>
+  <div id="point-flash"></div>
+  <div id="swipe-hint">SWIPE UP TO ROLL</div>
+</div>
+
+<div id="game-over-screen">
+  <h1>GAME OVER</h1>
+  <div class="final-score" id="finalScore">0</div>
+  <div class="new-high" id="newHighLabel">NEW HIGH SCORE!</div>
+  <button class="play-again" id="playAgainBtn">PLAY AGAIN</button>
+</div>
+
+<script>
+// ============ AUDIO ENGINE (Web Audio API) ============
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playRollSound() {
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(80, audioCtx.currentTime);
+  osc.frequency.linearRampToValueAtTime(200, audioCtx.currentTime + 0.3);
+  gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+}
+
+function playScoreSound(pts) {
+  ensureAudio();
+  const baseFreq = 300 + pts * 4;
+  for (let i = 0; i < 3; i++) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(baseFreq + i * 150, audioCtx.currentTime + i * 0.08);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.08 + 0.2);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(audioCtx.currentTime + i * 0.08);
+    osc.stop(audioCtx.currentTime + i * 0.08 + 0.2);
+  }
+}
+
+function playBumpSound() {
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc.frequency.linearRampToValueAtTime(60, audioCtx.currentTime + 0.1);
+  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function playGameOverSound() {
+  ensureAudio();
+  const notes = [523, 440, 349, 262];
+  notes.forEach((f, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(f, audioCtx.currentTime + i * 0.25);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.25 + 0.3);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(audioCtx.currentTime + i * 0.25);
+    osc.stop(audioCtx.currentTime + i * 0.25 + 0.3);
+  });
+}
+
+// ============ CANVAS SETUP ============
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, scale;
+const GAME_W = 400;
+const GAME_H = 750;
+
+function resize() {
+  const aspect = GAME_W / GAME_H;
+  if (window.innerWidth / window.innerHeight > aspect) {
+    H = window.innerHeight;
+    W = H * aspect;
+  } else {
+    W = window.innerWidth;
+    H = W / aspect;
+  }
+  canvas.width = W;
+  canvas.height = H;
+  scale = W / GAME_W;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ============ GAME STATE ============
+const TOTAL_BALLS = 9;
+let score = 0;
+let ballsRemaining = TOTAL_BALLS;
+let highScore = parseInt(localStorage.getItem('skeeball_high') || '0');
+let gameState = 'ready'; // ready, rolling, scoring, gameover
+
+// Ball physics
+let ball = { x: 0, y: 0, vx: 0, vy: 0, radius: 14, active: false, trail: [] };
+
+// Swipe tracking
+let swipeStartX = 0, swipeStartY = 0, swipeStartTime = 0;
+let isSwiping = false;
+
+// Scoring zones (in game coords) - these are the target holes at the top
+const LANE_LEFT = 100;
+const LANE_RIGHT = 300;
+const LANE_TOP = 80;
+const LANE_BOTTOM = 620;
+const RAMP_START_Y = 480;
+
+// Scoring rings (concentric arcs at top of lane)
+const RING_CENTER_X = 200;
+const RING_CENTER_Y = 120;
+const RINGS = [
+  { radius: 22, points: 100, color: '#f0f' },
+  { radius: 48, points: 50, color: '#f00' },
+  { radius: 74, points: 40, color: '#f80' },
+  { radius: 100, points: 30, color: '#ff0' },
+  { radius: 130, points: 20, color: '#0f0' },
+  { radius: 170, points: 10, color: '#0ff' },
+];
+
+// Particles
+let particles = [];
+
+// Point flash animation
+let pointFlashTimer = 0;
+let pointFlashValue = 0;
+
+// ============ UI ELEMENTS ============
+const scoreValEl = document.getElementById('scoreVal');
+const ballsLeftEl = document.getElementById('ballsLeft');
+const highScoreValEl = document.getElementById('highScoreVal');
+const popupEl = document.getElementById('popup');
+const swipeHintEl = document.getElementById('swipe-hint');
+const pointFlashEl = document.getElementById('point-flash');
+const gameOverScreen = document.getElementById('game-over-screen');
+const finalScoreEl = document.getElementById('finalScore');
+const newHighLabel = document.getElementById('newHighLabel');
+const playAgainBtn = document.getElementById('playAgainBtn');
+
+highScoreValEl.textContent = 'HI: ' + highScore;
+
+function updateUI() {
+  scoreValEl.textContent = score;
+  ballsLeftEl.textContent = 'BALLS: ' + ballsRemaining;
+  highScoreValEl.textContent = 'HI: ' + highScore;
+}
+
+function showPointFlash(pts) {
+  pointFlashEl.textContent = '+' + pts;
+  pointFlashEl.style.opacity = 1;
+  pointFlashEl.style.transform = 'translate(-50%, -50%) scale(1.2)';
+  if (pts >= 100) {
+    pointFlashEl.style.color = '#f0f';
+    pointFlashEl.style.textShadow = '0 0 30px #f0f, 0 0 60px #f0f';
+  } else if (pts >= 50) {
+    pointFlashEl.style.color = '#f00';
+    pointFlashEl.style.textShadow = '0 0 20px #f00, 0 0 40px #f00';
+  } else {
+    pointFlashEl.style.color = '#ff0';
+    pointFlashEl.style.textShadow = '0 0 20px #ff0, 0 0 40px #f80';
+  }
+  pointFlashTimer = 60;
+}
+
+function showPopup(text) {
+  popupEl.textContent = text;
+  popupEl.classList.add('visible');
+  setTimeout(() => popupEl.classList.remove('visible'), 1200);
+}
+
+// ============ INPUT HANDLING ============
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: (clientX - rect.left) / scale,
+    y: (clientY - rect.top) / scale
+  };
+}
+
+function onStart(e) {
+  e.preventDefault();
+  if (gameState !== 'ready') return;
+  ensureAudio();
+  const pos = getPos(e);
+  // Only start swipe from bottom area (launch zone)
+  if (pos.y > 500) {
+    isSwiping = true;
+    swipeStartX = pos.x;
+    swipeStartY = pos.y;
+    swipeStartTime = Date.now();
+  }
+}
+
+function onEnd(e) {
+  e.preventDefault();
+  if (!isSwiping || gameState !== 'ready') { isSwiping = false; return; }
+  isSwiping = false;
+
+  const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+  const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+  const rect = canvas.getBoundingClientRect();
+  const endX = (clientX - rect.left) / scale;
+  const endY = (clientY - rect.top) / scale;
+
+  const dx = endX - swipeStartX;
+  const dy = endY - swipeStartY;
+  const dt = (Date.now() - swipeStartTime) / 1000;
+
+  // Must swipe upward
+  if (dy > -30) return;
+
+  const speed = Math.sqrt(dx * dx + dy * dy) / dt;
+  const power = Math.min(Math.max(speed / 800, 0.3), 1.0);
+
+  launchBall(dx, dy, power);
+}
+
+canvas.addEventListener('touchstart', onStart, { passive: false });
+canvas.addEventListener('touchend', onEnd, { passive: false });
+canvas.addEventListener('mousedown', onStart);
+canvas.addEventListener('mouseup', onEnd);
+
+// ============ BALL LAUNCH ============
+function launchBall(dx, dy, power) {
+  if (ballsRemaining <= 0) return;
+
+  gameState = 'rolling';
+  ballsRemaining--;
+  updateUI();
+  swipeHintEl.style.display = 'none';
+
+  // Normalize direction
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const ndx = dx / dist;
+  const ndy = dy / dist;
+
+  // Launch from bottom center area
+  ball.x = 200 + (dx * 0.1);
+  ball.y = LANE_BOTTOM - 20;
+  ball.vx = ndx * power * 4.5;
+  ball.vy = ndy * power * 14;
+  ball.active = true;
+  ball.trail = [];
+
+  playRollSound();
+}
+
+// ============ PHYSICS & SCORING ============
+function updateBall() {
+  if (!ball.active) return;
+
+  // Store trail
+  ball.trail.push({ x: ball.x, y: ball.y });
+  if (ball.trail.length > 15) ball.trail.shift();
+
+  // Apply gravity (slows ball going up, pulls it back down)
+  ball.vy += 0.06;
+
+  // Friction
+  ball.vx *= 0.995;
+
+  // Move
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // Lane walls
+  if (ball.x < LANE_LEFT + ball.radius) {
+    ball.x = LANE_LEFT + ball.radius;
+    ball.vx = Math.abs(ball.vx) * 0.5;
+    playBumpSound();
+  }
+  if (ball.x > LANE_RIGHT - ball.radius) {
+    ball.x = LANE_RIGHT - ball.radius;
+    ball.vx = -Math.abs(ball.vx) * 0.5;
+    playBumpSound();
+  }
+
+  // Check if ball reached scoring zone (top area)
+  if (ball.vy >= 0 && ball.y <= RING_CENTER_Y + RINGS[RINGS.length - 1].radius + 30) {
+    scoreBall();
+    return;
+  }
+
+  // Ball fell back down (didn't reach top) - score gutter / 0
+  if (ball.y > LANE_BOTTOM + 30) {
+    scoreBall(true);
+    return;
+  }
+}
+
+function scoreBall(gutter) {
+  ball.active = false;
+  let pts = 0;
+
+  if (!gutter) {
+    const dx = ball.x - RING_CENTER_X;
+    const dy = ball.y - RING_CENTER_Y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Check rings from inside out
+    for (const ring of RINGS) {
+      if (dist <= ring.radius) {
+        pts = ring.points;
+        break;
+      }
+    }
+  }
+
+  if (pts > 0) {
+    score += pts;
+    playScoreSound(pts);
+    showPointFlash(pts);
+
+    // Spawn particles at ball location
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = Math.random() * 3 + 1;
+      particles.push({
+        x: ball.x, y: ball.y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        life: 40 + Math.random() * 20,
+        color: RINGS.find(r => r.points === pts)?.color || '#fff',
+        size: Math.random() * 4 + 2
+      });
+    }
+
+    if (pts >= 100) showPopup('AMAZING!');
+    else if (pts >= 50) showPopup('GREAT SHOT!');
+    else if (pts >= 40) showPopup('NICE!');
+  } else {
+    playBumpSound();
+  }
+
+  updateUI();
+
+  // Delay before next ball or game over
+  setTimeout(() => {
+    if (ballsRemaining <= 0) {
+      endGame();
+    } else {
+      gameState = 'ready';
+      swipeHintEl.style.display = 'block';
+    }
+  }, 800);
+}
+
+function endGame() {
+  gameState = 'gameover';
+  playGameOverSound();
+
+  let isNewHigh = false;
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('skeeball_high', highScore);
+    isNewHigh = true;
+  }
+
+  updateUI();
+  finalScoreEl.textContent = score;
+  newHighLabel.style.display = isNewHigh ? 'block' : 'none';
+  gameOverScreen.classList.add('visible');
+}
+
+function resetGame() {
+  score = 0;
+  ballsRemaining = TOTAL_BALLS;
+  gameState = 'ready';
+  ball.active = false;
+  ball.trail = [];
+  particles = [];
+  updateUI();
+  gameOverScreen.classList.remove('visible');
+  swipeHintEl.style.display = 'block';
+}
+
+playAgainBtn.addEventListener('click', resetGame);
+playAgainBtn.addEventListener('touchend', (e) => { e.preventDefault(); resetGame(); });
+
+// ============ RENDERING ============
+let frameCount = 0;
+
+function drawLane() {
+  // Lane background
+  const laneGrad = ctx.createLinearGradient(0, 0, 0, GAME_H);
+  laneGrad.addColorStop(0, '#1a0a2e');
+  laneGrad.addColorStop(0.5, '#0d1b2a');
+  laneGrad.addColorStop(1, '#1b2838');
+  ctx.fillStyle = laneGrad;
+  ctx.fillRect(LANE_LEFT - 15, 40, LANE_RIGHT - LANE_LEFT + 30, LANE_BOTTOM - 20);
+
+  // Lane surface
+  const surfGrad = ctx.createLinearGradient(0, RAMP_START_Y, 0, LANE_BOTTOM);
+  surfGrad.addColorStop(0, '#2a1a4a');
+  surfGrad.addColorStop(1, '#1a2a3a');
+  ctx.fillStyle = surfGrad;
+  ctx.fillRect(LANE_LEFT, RAMP_START_Y, LANE_RIGHT - LANE_LEFT, LANE_BOTTOM - RAMP_START_Y);
+
+  // Lane border neon
+  ctx.strokeStyle = '#f0f';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = '#f0f';
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.moveTo(LANE_LEFT, LANE_BOTTOM);
+  ctx.lineTo(LANE_LEFT, LANE_TOP);
+  ctx.lineTo(LANE_RIGHT, LANE_TOP);
+  ctx.lineTo(LANE_RIGHT, LANE_BOTTOM);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Ramp lines (perspective guides)
+  ctx.strokeStyle = 'rgba(255, 0, 255, 0.15)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const y = RAMP_START_Y + i * 30;
+    ctx.beginPath();
+    ctx.moveTo(LANE_LEFT, y);
+    ctx.lineTo(LANE_RIGHT, y);
+    ctx.stroke();
+  }
+
+  // Center line
+  ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+  ctx.setLineDash([5, 10]);
+  ctx.beginPath();
+  ctx.moveTo(200, LANE_TOP + 50);
+  ctx.lineTo(200, LANE_BOTTOM);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawScoringRings() {
+  // Draw rings from outside in
+  for (let i = RINGS.length - 1; i >= 0; i--) {
+    const ring = RINGS[i];
+    const pulse = Math.sin(frameCount * 0.03 + i) * 0.15 + 0.85;
+
+    // Ring arc (semi-circle facing down)
+    ctx.beginPath();
+    ctx.arc(RING_CENTER_X, RING_CENTER_Y, ring.radius, 0, Math.PI, true);
+    ctx.closePath();
+
+    // Fill
+    ctx.fillStyle = ring.color + '18';
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = ring.color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = pulse;
+    ctx.shadowColor = ring.color;
+    ctx.shadowBlur = 8;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+
+    // Score label
+    ctx.fillStyle = ring.color;
+    ctx.font = (ring.points === 100 ? 'bold 14px' : '11px') + ' "Courier New", monospace';
+    ctx.textAlign = 'center';
+    const labelY = RING_CENTER_Y - ring.radius + (ring.radius < 50 ? 16 : 20);
+    ctx.fillText(ring.points, RING_CENTER_X, labelY);
+  }
+}
+
+function drawBall() {
+  if (!ball.active) return;
+
+  // Trail
+  for (let i = 0; i < ball.trail.length; i++) {
+    const t = ball.trail[i];
+    const alpha = (i / ball.trail.length) * 0.4;
+    const sz = ball.radius * (i / ball.trail.length) * 0.8;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, sz, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 140, 0, ${alpha})`;
+    ctx.fill();
+  }
+
+  // Ball shadow
+  ctx.beginPath();
+  ctx.arc(ball.x + 3, ball.y + 3, ball.radius, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+
+  // Ball
+  const ballGrad = ctx.createRadialGradient(
+    ball.x - 4, ball.y - 4, 2,
+    ball.x, ball.y, ball.radius
+  );
+  ballGrad.addColorStop(0, '#fff');
+  ballGrad.addColorStop(0.3, '#ddd');
+  ballGrad.addColorStop(1, '#888');
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+  ctx.fillStyle = ballGrad;
+  ctx.fill();
+
+  // Ball glow
+  ctx.shadowColor = '#f80';
+  ctx.shadowBlur = 12;
+  ctx.strokeStyle = 'rgba(255, 140, 0, 0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (p.life / 60), 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life / 60;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+}
+
+function drawLaunchZone() {
+  if (gameState !== 'ready') return;
+
+  // Launch area indicator
+  const pulseAlpha = Math.sin(frameCount * 0.05) * 0.15 + 0.2;
+  ctx.fillStyle = `rgba(0, 255, 255, ${pulseAlpha})`;
+  ctx.fillRect(LANE_LEFT, LANE_BOTTOM - 60, LANE_RIGHT - LANE_LEFT, 60);
+
+  // Ball preview
+  const previewY = LANE_BOTTOM - 30;
+  const ballGrad = ctx.createRadialGradient(198, previewY - 2, 2, 200, previewY, 14);
+  ballGrad.addColorStop(0, '#fff');
+  ballGrad.addColorStop(0.3, '#ddd');
+  ballGrad.addColorStop(1, '#888');
+  ctx.beginPath();
+  ctx.arc(200, previewY, 14, 0, Math.PI * 2);
+  ctx.fillStyle = ballGrad;
+  ctx.fill();
+
+  // Arrow hint
+  ctx.strokeStyle = `rgba(0, 255, 255, ${pulseAlpha + 0.3})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(200, LANE_BOTTOM - 65);
+  ctx.lineTo(200, LANE_BOTTOM - 85);
+  ctx.moveTo(193, LANE_BOTTOM - 78);
+  ctx.lineTo(200, LANE_BOTTOM - 85);
+  ctx.lineTo(207, LANE_BOTTOM - 78);
+  ctx.stroke();
+}
+
+function drawCabinetDecor() {
+  // Top arch/header
+  ctx.fillStyle = '#1a0a2e';
+  ctx.fillRect(0, 0, GAME_W, 40);
+  ctx.strokeStyle = '#f0f';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#f0f';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(0, 40);
+  ctx.lineTo(GAME_W, 40);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Side decorations
+  const sideGlow = Math.sin(frameCount * 0.04) * 0.3 + 0.7;
+  ctx.fillStyle = `rgba(0, 255, 255, ${sideGlow * 0.1})`;
+  ctx.fillRect(0, 40, LANE_LEFT - 15, LANE_BOTTOM);
+  ctx.fillRect(LANE_RIGHT + 15, 40, GAME_W - LANE_RIGHT - 15, LANE_BOTTOM);
+
+  // Neon side strips
+  for (let y = 60; y < LANE_BOTTOM; y += 40) {
+    const glow = Math.sin(frameCount * 0.06 + y * 0.01) * 0.4 + 0.6;
+    ctx.fillStyle = `rgba(255, 0, 255, ${glow * 0.3})`;
+    ctx.fillRect(LANE_LEFT - 12, y, 4, 20);
+    ctx.fillRect(LANE_RIGHT + 8, y, 4, 20);
+  }
+
+  // Bottom area (ball return)
+  const bottomGrad = ctx.createLinearGradient(0, LANE_BOTTOM, 0, GAME_H);
+  bottomGrad.addColorStop(0, '#1a2a3a');
+  bottomGrad.addColorStop(1, '#0a0a1a');
+  ctx.fillStyle = bottomGrad;
+  ctx.fillRect(0, LANE_BOTTOM, GAME_W, GAME_H - LANE_BOTTOM);
+
+  // Ball indicators at bottom
+  const indicatorY = LANE_BOTTOM + 40;
+  for (let i = 0; i < TOTAL_BALLS; i++) {
+    const ix = 80 + i * 30;
+    ctx.beginPath();
+    ctx.arc(ix, indicatorY, 8, 0, Math.PI * 2);
+    if (i < ballsRemaining) {
+      ctx.fillStyle = '#0ff';
+      ctx.shadowColor = '#0ff';
+      ctx.shadowBlur = 6;
+    } else {
+      ctx.fillStyle = '#333';
+      ctx.shadowBlur = 0;
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Separator line
+  ctx.strokeStyle = '#0ff';
+  ctx.lineWidth = 1;
+  ctx.shadowColor = '#0ff';
+  ctx.shadowBlur = 5;
+  ctx.beginPath();
+  ctx.moveTo(40, LANE_BOTTOM + 10);
+  ctx.lineTo(GAME_W - 40, LANE_BOTTOM + 10);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+// ============ UPDATE & RENDER LOOP ============
+function update() {
+  frameCount++;
+
+  // Update ball
+  if (ball.active) updateBall();
+
+  // Update particles
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.05;
+    p.life--;
+  });
+  particles = particles.filter(p => p.life > 0);
+
+  // Point flash fade
+  if (pointFlashTimer > 0) {
+    pointFlashTimer--;
+    if (pointFlashTimer < 20) {
+      pointFlashEl.style.opacity = pointFlashTimer / 20;
+    }
+    pointFlashEl.style.transform = `translate(-50%, ${-50 - (60 - pointFlashTimer) * 0.5}%) scale(${1 + (60 - pointFlashTimer) * 0.005})`;
+  }
+}
+
+function render() {
+  ctx.save();
+  ctx.scale(scale, scale);
+
+  // Clear
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, GAME_W, GAME_H);
+
+  drawCabinetDecor();
+  drawLane();
+  drawScoringRings();
+  drawLaunchZone();
+  drawBall();
+  drawParticles();
+
+  ctx.restore();
+}
+
+function gameLoop() {
+  update();
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+// Start
+updateUI();
+gameLoop();
+</script>
+
+</body>
+</html>
