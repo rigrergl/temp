@@ -602,27 +602,27 @@
 
     // Power-up definitions
     const POWERUP_TYPES = [
-        { id: 'spread', label: 'SPREAD SHOT', color: '#f80', icon: 'W' },
+        { id: 'spread', label: 'SPREAD SHOT', color: '#4af', icon: 'W' },
         { id: 'laser',  label: 'MEGA LASER',  color: '#0ff', icon: 'L' },
-        { id: 'missile', label: 'HOMING MISSILES', color: '#f0f', icon: 'M' },
+        { id: 'missile', label: 'HOMING MISSILES', color: '#48f', icon: 'M' },
         { id: 'shield', label: 'SHIELD',      color: '#0f0', icon: 'S' },
         { id: 'timewarp', label: 'TIME WARP', color: '#a0f', icon: 'T' },
-        { id: 'pierce', label: 'PIERCING SHOT', color: '#ff4', icon: 'P' },
+        { id: 'pierce', label: 'PIERCING SHOT', color: '#4af', icon: 'P' },
         { id: 'blackhole', label: 'BLACK HOLE', color: '#609', icon: 'O' },
-        { id: 'boomerang', label: 'BOOMERANG', color: '#f55', icon: 'B' },
-        { id: 'drunk', label: 'DRUNK MISSILES', color: '#5f5', icon: 'D' },
+        { id: 'boomerang', label: 'BOOMERANG', color: '#4af', icon: 'B' },
+        { id: 'drunk', label: 'DRUNK MISSILES', color: '#48f', icon: 'D' },
         { id: 'lightning', label: 'CHAIN LIGHTNING', color: '#aef', icon: 'Z' },
-        { id: 'gravity', label: 'GRAVITY FLIP', color: '#fa0', icon: 'G' },
-        { id: 'minigun', label: 'MINIGUN', color: '#ccc', icon: 'R' },
+        { id: 'gravity', label: 'GRAVITY FLIP', color: '#4af', icon: 'G' },
+        { id: 'minigun', label: 'MINIGUN', color: '#6bf', icon: 'R' },
         { id: 'plasma', label: 'PLASMA WAVE', color: '#0ef', icon: 'X' },
-        { id: 'meteor', label: 'METEOR SHOWER', color: '#f60', icon: 'E' },
+        { id: 'meteor', label: 'METEOR SHOWER', color: '#38f', icon: 'E' },
         { id: 'freeze', label: 'FREEZE RAY', color: '#8ff', icon: 'F' },
-        { id: 'ricochet', label: 'RICOCHET', color: '#ef0', icon: 'K' },
-        { id: 'drones', label: 'DRONE SWARM', color: '#bf0', icon: 'N' },
-        { id: 'vortex', label: 'VORTEX BEAM', color: '#f0a', icon: 'V' },
-        { id: 'photon', label: 'PHOTON TORPEDO', color: '#fa5', icon: 'Q' },
+        { id: 'ricochet', label: 'RICOCHET', color: '#4af', icon: 'K' },
+        { id: 'drones', label: 'DRONE SWARM', color: '#4af', icon: 'N' },
+        { id: 'vortex', label: 'VORTEX BEAM', color: '#48f', icon: 'V' },
+        { id: 'photon', label: 'PHOTON TORPEDO', color: '#48f', icon: 'Q' },
         { id: 'dualshot', label: 'DUAL SHOT', color: '#8cf', icon: 'II', common: true },
-        { id: 'supernova', label: '⭐ SUPERNOVA ⭐', color: '#ff0', icon: '★', rare: true },
+        { id: 'supernova', label: '⭐ SUPERNOVA ⭐', color: '#4af', icon: '★', rare: true },
     ];
 
     function resize() {
@@ -1267,7 +1267,7 @@
                     vx: (Math.random() - 0.5) * 1.5,
                     vy: (Math.random() - 0.5) * 1.5 + 1,
                     life: 12, maxLife: 12,
-                    color: '#f0f',
+                    color: '#48f',
                     size: 3 * scale
                 });
             }
@@ -1379,7 +1379,7 @@
                 if (Math.abs(bm.x - e.x) < e.w * 0.6 + 10 * scale && Math.abs(bm.y - e.y) < e.h * 0.6 + 10 * scale) {
                     bm.hit.add(e);
                     hitEnemy(e);
-                    spawnParticles(e.x, e.y, '#f55', 6, 3);
+                    spawnParticles(e.x, e.y, '#4af', 6, 3);
                 }
             }
             if (bm.t >= 1) {
@@ -1410,7 +1410,7 @@
                 }
                 // Destroy bullets that reach the vortex center
                 if (dist < 35 * scale) {
-                    spawnParticles(eb.x, eb.y, '#fa0', 4, 3);
+                    spawnParticles(eb.x, eb.y, '#4af', 4, 3);
                     enemyBullets.splice(i, 1);
                 }
             }
@@ -1522,7 +1522,7 @@
                 particles.push({
                     x: m.x, y: m.y,
                     vx: (Math.random() - 0.5) * 2, vy: -Math.random() * 2,
-                    life: 15, maxLife: 15, color: '#f80', size: 3 * scale
+                    life: 15, maxLife: 15, color: '#4af', size: 3 * scale
                 });
             }
         }
@@ -1565,7 +1565,7 @@
                 particles.push({
                     x: pt.x + (Math.random() - 0.5) * 6, y: pt.y + 5 * scale,
                     vx: (Math.random() - 0.5), vy: Math.random() * 2,
-                    life: 12, maxLife: 12, color: '#fa5', size: 3 * scale
+                    life: 12, maxLife: 12, color: '#48f', size: 3 * scale
                 });
             }
             // Hit enemy or reach top -> explode
@@ -2138,7 +2138,9 @@
                 ctx.fillStyle = '#fff';
                 ctx.fillRect(b.x - 1 * scale, b.y - 6 * scale, 2 * scale, 12 * scale);
             } else if (b.ricochet) {
-                ctx.fillStyle = '#ef0';
+                ctx.shadowColor = '#4af';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = '#4af';
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, 4 * scale, 0, Math.PI * 2);
                 ctx.fill();
@@ -2146,16 +2148,17 @@
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, 2 * scale, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.shadowBlur = 0;
             } else if (b.drone) {
-                ctx.fillStyle = '#bf0';
+                ctx.fillStyle = '#6bf';
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, 3 * scale, 0, Math.PI * 2);
                 ctx.fill();
             } else if (b.drunk) {
-                // Drunk wobbly green bullets
-                ctx.shadowColor = '#5f5';
+                // Drunk wobbly blue bullets
+                ctx.shadowColor = '#48f';
                 ctx.shadowBlur = 10;
-                ctx.fillStyle = '#5f5';
+                ctx.fillStyle = '#48f';
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, 4 * scale, 0, Math.PI * 2);
                 ctx.fill();
@@ -2166,17 +2169,17 @@
                 ctx.shadowBlur = 0;
             } else if (b.pierce) {
                 // Piercing shot - bright wide bolt
-                ctx.shadowColor = '#ff4';
+                ctx.shadowColor = '#4af';
                 ctx.shadowBlur = 14;
-                ctx.fillStyle = '#ff4';
+                ctx.fillStyle = '#4af';
                 ctx.fillRect(b.x - 3 * scale, b.y - 10 * scale, 6 * scale, 20 * scale);
                 ctx.fillStyle = '#fff';
                 ctx.fillRect(b.x - 1.5 * scale, b.y - 8 * scale, 3 * scale, 16 * scale);
                 ctx.shadowBlur = 0;
             } else {
-                ctx.shadowColor = '#ff0';
+                ctx.shadowColor = '#4af';
                 ctx.shadowBlur = 8;
-                ctx.fillStyle = '#ff0';
+                ctx.fillStyle = '#4af';
                 ctx.fillRect(b.x - 1.5 * scale, b.y - 7 * scale, 3 * scale, 14 * scale);
                 ctx.fillStyle = '#fff';
                 ctx.fillRect(b.x - 0.7 * scale, b.y - 5 * scale, 1.4 * scale, 10 * scale);
@@ -2190,7 +2193,7 @@
             ctx.translate(m.x, m.y);
             ctx.rotate(m.angle + Math.PI / 2);
             // Body
-            ctx.fillStyle = '#f0f';
+            ctx.fillStyle = '#48f';
             ctx.beginPath();
             ctx.moveTo(0, -8 * scale);
             ctx.lineTo(-3 * scale, 5 * scale);
@@ -2198,7 +2201,7 @@
             ctx.closePath();
             ctx.fill();
             // Fins
-            ctx.fillStyle = '#a0a';
+            ctx.fillStyle = '#26a';
             ctx.beginPath();
             ctx.moveTo(-3 * scale, 3 * scale);
             ctx.lineTo(-6 * scale, 7 * scale);
@@ -2259,13 +2262,13 @@
             ctx.save();
             ctx.translate(bm.x, bm.y);
             ctx.rotate(bm.t * Math.PI * 6); // spinning
-            ctx.fillStyle = '#f55';
+            ctx.fillStyle = '#4af';
             ctx.beginPath();
             ctx.moveTo(0, -10 * scale);
             ctx.quadraticCurveTo(12 * scale, 0, 0, 4 * scale);
             ctx.quadraticCurveTo(-12 * scale, 0, 0, -10 * scale);
             ctx.fill();
-            ctx.fillStyle = '#faa';
+            ctx.fillStyle = '#adf';
             ctx.beginPath();
             ctx.arc(0, -3 * scale, 2 * scale, 0, Math.PI * 2);
             ctx.fill();
@@ -2304,7 +2307,7 @@
 
         // Gravity vortex overlay + swirl around player
         if (currentPowerUp === 'gravity') {
-            ctx.fillStyle = `rgba(255,160,0,${0.04 + Math.sin(frameCount * 0.08) * 0.02})`;
+            ctx.fillStyle = `rgba(60,130,255,${0.04 + Math.sin(frameCount * 0.08) * 0.02})`;
             ctx.fillRect(-5, -5, W + 10, H + 10);
             // Vortex rings
             for (let r = 0; r < 3; r++) {
@@ -2312,9 +2315,9 @@
                 let alpha = 0.25 - r * 0.07;
                 ctx.beginPath();
                 ctx.arc(player.x, player.y, radius, frameCount * 0.04 + r, frameCount * 0.04 + r + 4.5);
-                ctx.strokeStyle = `rgba(255,160,0,${alpha})`;
+                ctx.strokeStyle = `rgba(60,130,255,${alpha})`;
                 ctx.lineWidth = (3 - r) * scale;
-                ctx.shadowColor = '#fa0';
+                ctx.shadowColor = '#4af';
                 ctx.shadowBlur = 12;
                 ctx.stroke();
             }
@@ -2339,7 +2342,7 @@
             ctx.save();
             ctx.translate(m.x, m.y);
             ctx.rotate(m.rotation);
-            ctx.fillStyle = '#f60';
+            ctx.fillStyle = '#38f';
             ctx.beginPath();
             // Jagged rock shape
             for (let k = 0; k < 7; k++) {
@@ -2350,7 +2353,7 @@
             }
             ctx.closePath();
             ctx.fill();
-            ctx.fillStyle = '#fa0';
+            ctx.fillStyle = '#8bf';
             ctx.beginPath();
             ctx.arc(0, 0, m.size * 0.4, 0, Math.PI * 2);
             ctx.fill();
@@ -2362,7 +2365,7 @@
             ctx.save();
             ctx.translate(d.x, d.y);
             ctx.rotate(frameCount * 0.1);
-            ctx.fillStyle = '#bf0';
+            ctx.fillStyle = '#4af';
             // Small diamond drone
             ctx.beginPath();
             ctx.moveTo(0, -5 * scale);
@@ -2380,7 +2383,7 @@
 
         // Photon torpedoes
         for (let pt of photonTorpedoes) {
-            ctx.fillStyle = '#fa5';
+            ctx.fillStyle = '#48f';
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 7 * scale, 0, Math.PI * 2);
             ctx.fill();
@@ -2388,7 +2391,7 @@
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 3 * scale, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = `rgba(255,170,80,${0.5 + Math.sin(frameCount * 0.2) * 0.3})`;
+            ctx.strokeStyle = `rgba(80,170,255,${0.5 + Math.sin(frameCount * 0.2) * 0.3})`;
             ctx.lineWidth = 2 * scale;
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, 10 * scale + Math.sin(frameCount * 0.15) * 3 * scale, 0, Math.PI * 2);
@@ -2401,13 +2404,13 @@
             let endX = player.x + Math.cos(vb.angle) * vb.length;
             let endY = player.y + Math.sin(vb.angle) * vb.length;
             ctx.save();
-            ctx.strokeStyle = `rgba(255,0,170,${alpha * 0.4})`;
+            ctx.strokeStyle = `rgba(30,100,255,${alpha * 0.4})`;
             ctx.lineWidth = 20 * scale;
             ctx.beginPath();
             ctx.moveTo(player.x, player.y);
             ctx.lineTo(endX, endY);
             ctx.stroke();
-            ctx.strokeStyle = `rgba(255,100,200,${alpha * 0.8})`;
+            ctx.strokeStyle = `rgba(80,170,255,${alpha * 0.8})`;
             ctx.lineWidth = 6 * scale;
             ctx.stroke();
             ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
@@ -2479,10 +2482,10 @@
                 ctx.shadowBlur = 0;
                 ctx.restore();
             } else if (b.cluster) {
-                // Cluster bomb - orange square
-                ctx.shadowColor = '#f80';
+                // Cluster bomb - red square
+                ctx.shadowColor = '#f44';
                 ctx.shadowBlur = 6;
-                ctx.fillStyle = '#f80';
+                ctx.fillStyle = '#f55';
                 ctx.save();
                 ctx.translate(b.x, b.y);
                 ctx.rotate(frameCount * 0.1);
